@@ -36,7 +36,7 @@
     },
     "msi": {
       "oneClick": false,
-      "perMachine": true,
+      "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "runAfterFinish": true
