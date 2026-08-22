@@ -30,9 +30,14 @@
       "artifactName": "Mod Builder Installer Mac.${ext}"
     },
     "win": {
-      "target": "nsis",
+      "target": "msi",
       "icon": "build/icon.ico",
-      "artifactName": "Mod Builder Installer Windows.${ext}"
+      "artifactName": "Mod Builder Installer Windows.${ext}",
+      "oneClick": false,
+      "perMachine": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
     },
     "linux": {
       "target": "AppImage",

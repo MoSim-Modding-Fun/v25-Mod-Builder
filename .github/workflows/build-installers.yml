@@ -12,7 +12,7 @@ jobs:
         include:
           - os: windows-latest
             artifact: installer-windows
-            glob: dist/*.exe
+            glob: dist/*.msi
           - os: macos-latest
             artifact: installer-macos
             glob: dist/*.dmg

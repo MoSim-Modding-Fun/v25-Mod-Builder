@@ -55,9 +55,15 @@ npm run dist
 ```
 
 Uses `electron-builder` to produce an installer for whatever OS you run it
-on (`.exe`/NSIS on Windows, `.dmg` on macOS, `.AppImage` on Linux). This repo
-doesn't set up code signing or notarization — packaged builds will trigger
-an "unidentified developer" warning on macOS and a SmartScreen warning on
+on (`.msi` on Windows, `.dmg` on macOS, `.AppImage` on Linux). The Windows
+installer is a full multi-page wizard (install location, Start Menu/desktop
+shortcut options) built on real Windows Installer (MSI), not a one-click
+NSIS installer — so re-running it over an existing install brings up the
+standard repair/uninstall/reinstall maintenance dialog automatically; that's
+native MSI behavior keyed off a stable upgrade code (derived from `appId`),
+not something configured separately. This repo doesn't set up code signing
+or notarization — packaged builds will trigger an "unidentified developer"
+warning on macOS and a SmartScreen warning on
 Windows unless you sign them yourself.
 
 ### CI builds (GitHub Actions)
