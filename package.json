@@ -26,15 +26,18 @@
     "icon": "build/icon.png",
     "mac": {
       "target": "dmg",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "Mod Builder Installer Mac.${ext}"
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "artifactName": "Mod Builder Installer Windows.${ext}"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "Mod Builder Installer Linux.${ext}"
     }
   }
 }
