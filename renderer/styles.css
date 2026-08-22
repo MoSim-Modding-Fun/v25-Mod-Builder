@@ -1,0 +1,479 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: #cce4f7;
+  color: #000;
+}
+
+:focus-visible {
+  outline: 2px solid #0078d7;
+  outline-offset: 1px;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 12px;
+  background: #f0f0f0;
+  color: #000;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-x: hidden;
+}
+
+/* Wayfinding, not decoration: the current step is the only saturated color on the page. */
+.step-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 1px 0 3px;
+}
+
+.step-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d6d6d6;
+  border: 1px solid #b7b7b7;
+}
+
+.step-dots .dot.active {
+  background: #0078d7;
+  border-color: #0063b1;
+}
+
+#pages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page.active {
+  display: flex;
+}
+
+/* Classic Win32 groupbox: etched border with the legend notched into it */
+fieldset.group {
+  border: 1px solid #adadad;
+  border-radius: 2px;
+  margin: 0;
+  padding: 8px 8px 6px;
+  background: #f0f0f0;
+}
+
+fieldset.group legend {
+  padding: 0 4px;
+  font-size: 12px;
+  color: #000;
+}
+
+.row {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.field {
+  flex: 1;
+  min-width: 0; /* let a long path actually shrink instead of overflowing the row */
+  background: #fff;
+  border: 1px solid #7a7a7a;
+  border-radius: 1px;
+  padding: 3px 6px;
+  font-size: 12px;
+  color: #000;
+  text-overflow: ellipsis;
+}
+
+.field:disabled,
+.field[readonly] {
+  background: #fff;
+  color: #000;
+}
+
+button {
+  background: linear-gradient(#fefefe, #e5e5e5);
+  color: #000;
+  border: 1px solid #8f8f8f;
+  border-radius: 2px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: linear-gradient(#ffffff, #ececec);
+  border-color: #0078d7;
+}
+
+button:active:not(:disabled) {
+  background: #e0e0e0;
+}
+
+button:disabled {
+  color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+.browse-btn {
+  width: 34px;
+  flex: none;
+  white-space: nowrap;
+}
+
+/* "SELECT" is wider than "...", so it gets its own width instead of clipping */
+.browse-btn.wide {
+  width: auto;
+  padding: 4px 12px;
+}
+
+.info {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #333;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.info .error {
+  color: #c00;
+}
+
+.info .ok {
+  color: #0a7d1f;
+}
+
+.list {
+  border: 1px solid #7a7a7a;
+  border-radius: 1px;
+  background: #fff;
+  padding: 2px;
+}
+
+.status-box {
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  color: #333;
+  padding: 6px;
+}
+
+.group-row {
+  border-bottom: 1px solid #e2e2e2;
+  padding: 4px 5px;
+}
+
+.group-row:last-child {
+  border-bottom: none;
+}
+
+.group-row label.main {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+input[type="checkbox"] {
+  accent-color: #0078d7;
+}
+
+.group-row .fields {
+  margin-top: 5px;
+  margin-left: 19px;
+  display: flex;
+  gap: 6px;
+}
+
+.group-row .fields label {
+  font-size: 10px;
+  color: #555;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+input[type="text"]:not(.field) {
+  background: #fff;
+  border: 1px solid #7a7a7a;
+  border-radius: 1px;
+  color: #000;
+  padding: 3px 5px;
+  font-size: 11px;
+  width: 100%;
+}
+
+input[type="text"]::placeholder {
+  color: #767676; /* 4.5:1 on white, #999 fails AA for placeholder text */
+}
+
+.preview-row {
+  padding: 3px 5px;
+  border-bottom: 1px solid #eee;
+  overflow-wrap: anywhere;
+}
+
+.preview-row:last-child {
+  border-bottom: none;
+}
+
+.platform-toggles {
+  display: flex;
+  gap: 16px;
+}
+
+.platform-toggles label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 18px;
+}
+
+.platform-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  padding: 2px 6px;
+  background: #fff;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* All four pass 4.5:1 on the white .platform-row background; #888/#0078d7 didn't */
+.badge.pending { color: #333; }
+.badge.running { color: #0063b1; }
+.badge.success { color: #0a7d1f; }
+.badge.failed { color: #c00; }
+
+/* Rufus's bottom bar: a "Log" link-style toggle on the left, START/CLOSE on the right */
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #0063b1; /* #0078d7 was 3.9:1 on this background, fails AA text */
+  text-decoration: underline;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.link-btn:hover {
+  background: none;
+  color: #004a86;
+}
+
+/* Solid, not the earlier light-to-dark gradient: white text dropped to ~1.6:1
+   against the gradient's lighter end. A flat fill keeps it readable everywhere. */
+.start-btn {
+  background: #2e7d32;
+  border: 1px solid #2e7d32;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 6px 22px;
+}
+
+.start-btn:hover:not(:disabled) {
+  background: #357a38;
+  border-color: #2e7d32;
+}
+
+.start-btn:active:not(:disabled) {
+  background: #245e28;
+}
+
+.start-btn:disabled {
+  background: #d8d8d8;
+  border-color: #b5b5b5;
+  color: #999;
+}
+
+.close-btn {
+  padding: 6px 16px;
+}
+
+/* A terminal is conventionally dark even inside a light shell (VS Code, Lunar
+   Client's own log panel do the same) - this is the one deliberately dark surface. */
+.console {
+  background: #0d1117;
+  border: 1px solid #1c2128;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  color: #9cb4d8;
+  overflow-wrap: anywhere;
+  position: relative;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* Scrollbar stays invisible while auto-following the bottom; only appears once
+   the user scrolls up, so it doesn't read as "this can scroll" during a live tail. */
+.console.scrolled-up {
+  scrollbar-color: #3a4353 transparent;
+}
+
+.console::-webkit-scrollbar {
+  width: 7px;
+}
+
+.console::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.console.scrolled-up::-webkit-scrollbar-thumb {
+  background: #3a4353;
+}
+
+.console-jump-btn {
+  display: none;
+  position: sticky;
+  bottom: 6px;
+  left: 100%;
+  transform: translateX(-100%);
+  background: #1c2430;
+  color: #cfd8e6;
+  border: 1px solid #333d4d;
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  cursor: pointer;
+}
+
+.console.scrolled-up .console-jump-btn {
+  display: inline-block;
+}
+
+.console-jump-btn:hover {
+  background: #262f3d;
+}
+
+.console-line {
+  padding: 3px 0;
+  border-bottom: 1px solid #1c2128;
+}
+
+.console-line:last-child {
+  border-bottom: none;
+}
+
+.console-time {
+  color: #5c6773;
+  margin-right: 8px;
+  user-select: none;
+}
+
+.console-line.summary-success { color: #7ee787; }
+.console-line.summary-failed { color: #ff7b72; }
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* One segment per (group x platform) build unit - e.g. 2 modpacks x 3 platforms = 6. */
+.progress-bar {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid #b7b7b7;
+  background: #fff;
+}
+
+.progress-segment {
+  flex: 1;
+  background: #d6d6d6;
+  transition: background-color 200ms ease-out;
+}
+
+.progress-segment.running { background: #0078d7; }
+.progress-segment.success { background: #2e7d32; }
+.progress-segment.failed { background: #c0392b; }
+
+.progress-percent {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #333;
+  min-width: 2.6em;
+  text-align: right;
+}
+
+.console-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.console-tab {
+  background: #e5e5e5;
+  border: 1px solid #adadad;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  padding: 3px 12px;
+  font-size: 11px;
+}
+
+.console-tab.active {
+  background: #0d1117;
+  color: #fff;
+  border-color: #1c2128;
+}
+
+.console-panel {
+  display: none;
+}
+
+.console-panel.active {
+  display: block;
+}

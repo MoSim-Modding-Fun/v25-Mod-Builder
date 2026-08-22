@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>v25 Mod Builder</title>
+  <link rel="icon" href="../build/icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="step-dots" id="step-dots">
+    <span class="dot" data-step="0"></span>
+    <span class="dot" data-step="1"></span>
+    <span class="dot" data-step="2"></span>
+  </div>
+
+  <main id="pages">
+    <section class="page active" id="page-project">
+      <fieldset class="group">
+        <legend>Project</legend>
+        <div class="row">
+          <input type="text" id="project-path-field" class="field" readonly placeholder="No project selected" />
+          <button id="select-project-btn" class="browse-btn wide">SELECT</button>
+        </div>
+        <div id="project-info" class="info"></div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>Unity Editor</legend>
+        <div class="row">
+          <input type="text" id="unity-path-field" class="field" readonly placeholder="No project selected" />
+          <button id="browse-unity-btn" class="browse-btn">...</button>
+        </div>
+        <div id="unity-info" class="info"></div>
+      </fieldset>
+    </section>
+
+    <section class="page" id="page-groups">
+      <fieldset class="group">
+        <legend>Groups</legend>
+        <div id="groups-list" class="list">No project selected yet.</div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>Platforms</legend>
+        <div class="platform-toggles">
+          <label><input type="checkbox" class="platform-check" value="win64" checked /> Windows</label>
+          <label><input type="checkbox" class="platform-check" value="osx" checked /> macOS</label>
+          <label><input type="checkbox" class="platform-check" value="linux64" checked /> Linux</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>Output Folder</legend>
+        <div class="row">
+          <input type="text" id="output-path-field" class="field" readonly placeholder="Default: <project>/Mods" />
+          <button id="choose-output-btn" class="browse-btn">...</button>
+          <button id="reset-output-btn" class="browse-btn" style="display:none" title="Reset to default">&#8635;</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>Preview</legend>
+        <div id="zip-preview" class="list status-box">Select a group and a platform to preview output filenames.</div>
+      </fieldset>
+    </section>
+
+    <section class="page" id="page-build">
+      <fieldset class="group">
+        <legend>Build Progress</legend>
+        <div id="build-status" class="status-row"></div>
+        <div class="progress-row">
+          <div id="progress-bar" class="progress-bar"></div>
+          <span id="progress-percent" class="progress-percent">0%</span>
+        </div>
+      </fieldset>
+
+      <fieldset class="group console-group">
+        <legend>Console</legend>
+        <div id="console-tabs" class="console-tabs"></div>
+        <div id="console-panels"></div>
+      </fieldset>
+    </section>
+  </main>
+
+  <div class="bottom-bar">
+    <button id="back-btn" class="close-btn" disabled>BACK</button>
+    <div class="spacer"></div>
+    <button id="next-btn" class="start-btn" disabled>NEXT</button>
+    <button id="build-btn" class="start-btn" style="display:none" disabled>START</button>
+    <button id="close-btn" class="close-btn">CLOSE</button>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

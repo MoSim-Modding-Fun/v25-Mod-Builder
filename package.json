@@ -1,0 +1,39 @@
+{
+  "name": "v25-mod-builder",
+  "version": "1.0.0",
+  "description": "Cross-platform GUI for building and exporting MoSimulator addressable mod groups.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "icon": "node scripts/generate-icon.mjs"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "jimp": "^1.6.1",
+    "png-to-ico": "^3.0.2"
+  },
+  "build": {
+    "appId": "com.mosim.v25modbuilder",
+    "productName": "v25 Mod Builder",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "icon": "build/icon.png",
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    }
+  }
+}
