@@ -27,7 +27,9 @@
     "mac": {
       "target": "dmg",
       "icon": "build/icon.png",
-      "artifactName": "Mod Builder Installer Mac.${ext}"
+      "artifactName": "Mod Builder Installer Mac.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "win": {
       "target": "msi",

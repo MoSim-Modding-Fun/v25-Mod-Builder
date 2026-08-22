@@ -66,6 +66,26 @@ or notarization — packaged builds will trigger an "unidentified developer"
 warning on macOS and a SmartScreen warning on
 Windows unless you sign them yourself.
 
+**On macOS specifically**, recent macOS versions (Sequoia+) don't just warn
+on an unsigned, unnotarized app — they block it outright with a
+"malware blocked and moved to Trash" dialog. Real Apple notarization (which
+stops this) requires a paid Apple Developer Program membership ($99/year);
+there's no free way around that check, since it validates against Apple's
+own servers. The mac build here is ad-hoc signed (`identity: "-"` in
+`package.json`, free, no account needed) purely so the app can launch at all
+on Apple Silicon — it does **not** satisfy Gatekeeper's notarization check.
+Until/unless notarization gets set up, anyone installing on macOS needs to
+manually clear the quarantine flag after downloading:
+
+```bash
+# If Gatekeeper already deleted it, re-extract "v25 Mod Builder.app" from
+# the .dmg first, then:
+xattr -cr "/Applications/v25 Mod Builder.app"
+```
+
+Or: after the block, open **System Settings → Privacy & Security** and look
+for an "Open Anyway" button near the bottom of the page.
+
 ### CI builds (GitHub Actions)
 
 `.github/workflows/build-installers.yml` only triggers on a pushed version
