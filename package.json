@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Cross-platform GUI for building and exporting MoSimulator addressable mod groups.",
   "main": "main.js",
+  "author": "seb",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder",
+    "dist": "electron-builder --publish never",
     "icon": "node scripts/generate-icon.mjs"
   },
   "devDependencies": {
