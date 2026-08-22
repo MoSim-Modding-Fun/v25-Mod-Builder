@@ -32,7 +32,9 @@
     "win": {
       "target": "msi",
       "icon": "build/icon.ico",
-      "artifactName": "Mod Builder Installer Windows.${ext}",
+      "artifactName": "Mod Builder Installer Windows.${ext}"
+    },
+    "msi": {
       "oneClick": false,
       "perMachine": true,
       "createDesktopShortcut": true,
