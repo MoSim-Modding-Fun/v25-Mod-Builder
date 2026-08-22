@@ -1,5 +1,13 @@
 # v25 Mod Builder
 
+> **macOS:** this app isn't notarized, so Gatekeeper will block it (and may
+> move it straight to Trash) after downloading. Recover it from Trash if
+> needed, then run:
+> ```bash
+> xattr -cr "/Applications/v25 Mod Builder.app"
+> ```
+> before opening it. See [Packaging](#packaging-optional) below for why.
+
 A small cross-platform (Windows/macOS/Linux) Electron GUI for building and
 exporting MoSimulator addressable mod groups, without hand-running the
 `Tools/build-mods-all-platforms.ps1` script in the MoSim-Reefscape-Public repo.
