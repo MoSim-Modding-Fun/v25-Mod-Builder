@@ -62,16 +62,15 @@ Windows unless you sign them yourself.
 
 ### CI builds (GitHub Actions)
 
-`.github/workflows/build-installers.yml` builds all three installers on every
-push/PR to `main` (and on demand via the Actions tab's "Run workflow"
-button) — one job per OS on GitHub's own Windows/macOS/Linux runners, each
-running `npm run dist` and uploading its installer as a workflow artifact
-(`installer-windows`/`installer-macos`/`installer-linux`, downloadable from
-the run's summary page, expires after GitHub's default retention period).
+`.github/workflows/build-installers.yml` only triggers on a pushed version
+tag matching `v*.*.*` (e.g. `v1.0.0`) — nothing runs on ordinary pushes or
+PRs. One job per OS builds on GitHub's own Windows/macOS/Linux runners via
+`npm run dist`, uploads each installer as a workflow artifact
+(`installer-windows`/`installer-macos`/`installer-linux`), then a final job
+downloads all three and creates a **GitHub Release** with them attached.
 Same caveat as above: these are unsigned builds.
 
-Pushing a version tag (`v1.0.0`, `v1.2.3`, ...) additionally creates a
-**GitHub Release** with all three installers attached permanently, e.g.:
+To cut a release:
 
 ```bash
 git tag v1.0.0
