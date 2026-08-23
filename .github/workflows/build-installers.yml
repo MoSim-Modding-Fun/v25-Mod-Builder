@@ -5,7 +5,12 @@ on:
     tags: ['v*.*.*']
 
 jobs:
-  build:
+  # Windows and Linux still ship the Electron app. macOS does not - see build-macos
+  # below: the Electron .dmg was getting flagged outright as malware by macOS's
+  # XProtect (not just the milder "unidentified developer" Gatekeeper warning), which
+  # is why mac/ (a native SwiftUI rewrite) exists at all. Building and releasing the
+  # Electron .dmg here would just keep shipping the broken artifact.
+  build-electron:
     strategy:
       fail-fast: false
       matrix:
@@ -13,9 +18,6 @@ jobs:
           - os: windows-latest
             artifact: installer-windows
             glob: dist/*.msi
-          - os: macos-latest
-            artifact: installer-macos
-            glob: dist/*.dmg
           - os: ubuntu-latest
             artifact: installer-linux
             glob: dist/*.AppImage
@@ -43,10 +45,65 @@ jobs:
           path: ${{ matrix.glob }}
           if-no-files-found: error
 
+  # Native Swift/SwiftUI app (mac/) - see mac/CONTEXT.md for why this exists instead of
+  # the Electron build. GitHub's macos-latest runners ship Xcode/Swift out of the box,
+  # so no toolchain setup is needed here (unlike a bare Command Line Tools install).
+  build-macos:
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build (release)
+        working-directory: mac
+        run: swift build -c release
+
+      # Wrapped in a minimal .app bundle (not shipped as a bare executable) - a raw SPM
+      # binary run outside a bundle doesn't reliably get window-server privileges on
+      # modern macOS. Ad-hoc signed (--sign -), not notarized: still unsigned-by-a-team,
+      # so it'll show the milder "unidentified developer" Gatekeeper prompt, which is
+      # the expected/acceptable outcome here - the goal was only to avoid the instant
+      # malware-tier block the Electron build triggered.
+      - name: Bundle .app
+        working-directory: mac
+        run: |
+          APP="V25 Mod Builder.app"
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS"
+          cp .build/release/V25ModBuilder "$APP/Contents/MacOS/V25 Mod Builder"
+          cat > "$APP/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>V25 Mod Builder</string>
+            <key>CFBundleIdentifier</key><string>com.v25.modbuilder</string>
+            <key>CFBundleName</key><string>V25 Mod Builder</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION#v}</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>LSMinimumSystemVersion</key><string>13.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+            <key>NSQuitAlwaysKeepsWindows</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          codesign --force --deep --sign - "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "V25ModBuilder-macOS.zip"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos
+          path: mac/V25ModBuilder-macOS.zip
+          if-no-files-found: error
+
   # Only runs when the push is a version tag (v1.0.0 etc) - creates a GitHub
   # Release and attaches the three installers built above to it.
   release:
-    needs: build
+    needs: [build-electron, build-macos]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
