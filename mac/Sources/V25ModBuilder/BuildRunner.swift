@@ -29,7 +29,10 @@ final class BuildRunner: ObservableObject {
         "Multiple Unity instances cannot open the same project",
     ]
 
-    func run(projectPath: String, unityPath: String, groups: [ModGroup], platforms: [PlatformTarget], outputDir: String?) async {
+    func run(projectPath rawProjectPath: String, unityPath: String, groups: [ModGroup], platforms: [PlatformTarget], outputDir: String?) async {
+        // Normalized the same way as ProjectService.resolveProjectFast() so this always
+        // matches the key an in-flight auto-register scan for the same project is using.
+        let projectPath = (rawProjectPath as NSString).standardizingPath
         isRunning = true
         defer { isRunning = false }
 
@@ -87,7 +90,9 @@ final class BuildRunner: ObservableObject {
             }
             tailer.start()
 
-            _ = await Self.runProcess(executable: unityPath, arguments: args)
+            await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) {
+                _ = await Self.runProcess(executable: unityPath, arguments: args)
+            }
             tailer.stop()
             tailer.drainOnce() // catch anything written between the last poll and process exit
 

@@ -28,6 +28,7 @@ const els = {
   selectProjectBtn: document.getElementById('select-project-btn'),
   projectPathField: document.getElementById('project-path-field'),
   projectInfo: document.getElementById('project-info'),
+  scanStatus: document.getElementById('scan-status'),
   unityPathField: document.getElementById('unity-path-field'),
   unityInfo: document.getElementById('unity-info'),
   browseUnityBtn: document.getElementById('browse-unity-btn'),
@@ -108,6 +109,13 @@ function syncWindowSize() {
   });
 }
 
+// Belt-and-suspenders for the manual syncWindowSize() calls scattered at each known
+// content-change site: those can still miss a beat when layout settles asynchronously
+// (webfont metrics, GTK reflow timing on Linux), which is how the build/console page
+// was observed overflowing past the window. A ResizeObserver catches *any* body size
+// change, regardless of what caused it.
+new ResizeObserver(() => syncWindowSize()).observe(document.body);
+
 els.backBtn.addEventListener('click', () => {
   if (currentPage > 0) showPage(currentPage - 1);
 });
@@ -141,7 +149,15 @@ function renderUnityInfo() {
   }
 }
 
+function setScanning(isScanning) {
+  els.scanStatus.style.display = isScanning ? 'flex' : 'none';
+  syncWindowSize();
+}
+
 // Shared by the SELECT button and by restoring the remembered project on launch.
+// Populates everything that's known immediately (no waiting on the background
+// auto-register-mod-folders scan main.js may have kicked off - see
+// window.api.onProjectScanComplete below, which fills in any groups that scan finds).
 function applyProjectInfo(info) {
   if (info.error) {
     renderProjectInfo(info);
@@ -149,6 +165,7 @@ function applyProjectInfo(info) {
     els.unityInfo.textContent = '';
     els.groupsList.textContent = 'No project selected yet.';
     projectPath = null;
+    setScanning(false);
     updateNav();
     return;
   }
@@ -160,8 +177,23 @@ function applyProjectInfo(info) {
   renderProjectInfo(info);
   renderUnityInfo();
   renderGroups(info.groups);
+  setScanning(Boolean(info.scanning));
   updateNav();
 }
+
+// Fires once the background scan main.js started for this project finishes. Ignored if
+// the user has since selected a different project (matches main.js's own guard).
+window.api.onProjectScanComplete((data) => {
+  if (data.projectPath !== projectPath) return;
+  setScanning(false);
+
+  const currentNames = Object.keys(groupsState);
+  const isSame = data.groups.length === currentNames.length && data.groups.every((n) => currentNames.includes(n));
+  if (!isSame) {
+    renderGroups(data.groups);
+    updateNav();
+  }
+});
 
 // Guards against a slow-resolving project load (e.g. the on-launch reload of the
 // remembered project, which can block on an auto-register Unity launch) clobbering a

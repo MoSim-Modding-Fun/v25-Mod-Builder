@@ -48,7 +48,7 @@
     },
     "linux": {
       "target": ["AppImage", "pacman"],
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "artifactName": "Mod Builder Installer Linux.${ext}"
     }
   }

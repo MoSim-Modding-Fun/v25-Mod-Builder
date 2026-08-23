@@ -16,4 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   onBuildLogLine: (callback) => {
     ipcRenderer.on('build-log-line', (_event, data) => callback(data));
   },
+  onProjectScanComplete: (callback) => {
+    ipcRenderer.on('project-scan-complete', (_event, data) => callback(data));
+  },
 });

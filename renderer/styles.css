@@ -162,6 +162,27 @@ button:disabled {
   color: #0a7d1f;
 }
 
+.scan-status {
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #b7b7b7;
+  border-top-color: #0078d7;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .list {
   border: 1px solid #7a7a7a;
   border-radius: 1px;

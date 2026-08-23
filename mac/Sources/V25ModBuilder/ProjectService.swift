@@ -5,6 +5,9 @@ struct ProjectInfo {
     let unityVersion: String?
     let groups: [String]
     let error: String?
+    /// True if a background Unity auto-register scan was kicked off for this project -
+    /// the caller should show a "scanning" indicator until scanForNewGroups resolves.
+    let scanning: Bool
 }
 
 /// Mirrors main.js's listAddressableGroups()/resolveProject() in the Electron app -
@@ -18,12 +21,15 @@ enum ProjectService {
     /// Must match AddressablesModExporter.cs's RobotsRoot constant exactly.
     static let robotsRootRelativePath = "Assets/Prefabs/Reefscape/Robots/Mods"
 
-    /// Mirrors main.js's async resolveProject(): reads the project, then (best-effort,
-    /// before listing groups) runs Unity headless to auto-register any new moddable
-    /// folder as a proper Addressable group - async because launching Unity can take
-    /// real wall-clock time and this app has no separate main/renderer process to hide
-    /// that behind, unlike Electron.
-    static func resolveProject(at path: String, unityPathOverride: String?) async -> ProjectInfo {
+    /// Mirrors main.js's resolveProjectFast(): filesystem-only, no Unity launch, so the
+    /// UI can populate immediately instead of blocking on autoRegisterNewModFolders
+    /// (which can take real wall-clock time). Call scanForNewGroups() afterwards
+    /// (only if `scanning` is true) to run that scan in the background.
+    static func resolveProjectFast(at rawPath: String) -> ProjectInfo {
+        // A trailing slash would otherwise make the same project look like two
+        // different keys to UnityLaunchQueue, letting a scan and a build race for the
+        // same project's lock file.
+        let path = (rawPath as NSString).standardizingPath
         let fm = FileManager.default
         let assetsDir = (path as NSString).appendingPathComponent("Assets")
         let versionFile = (path as NSString).appendingPathComponent("ProjectSettings/ProjectVersion.txt")
@@ -31,20 +37,26 @@ enum ProjectService {
         guard fm.fileExists(atPath: assetsDir), fm.fileExists(atPath: versionFile) else {
             return ProjectInfo(
                 projectPath: path, unityVersion: nil, groups: [],
-                error: "\"\(path)\" doesn't look like a Unity project (no Assets/ or ProjectSettings/ProjectVersion.txt)."
+                error: "\"\(path)\" doesn't look like a Unity project (no Assets/ or ProjectSettings/ProjectVersion.txt).",
+                scanning: false
             )
         }
 
         guard let versionText = try? String(contentsOfFile: versionFile, encoding: .utf8) else {
-            return ProjectInfo(projectPath: path, unityVersion: nil, groups: [], error: "Couldn't read ProjectVersion.txt.")
+            return ProjectInfo(projectPath: path, unityVersion: nil, groups: [], error: "Couldn't read ProjectVersion.txt.", scanning: false)
         }
 
         let unityVersion = extractEditorVersion(versionText)
-        let detectedUnityPath = unityVersion.flatMap { UnityLocator.detect(version: $0) }
-        await autoRegisterNewModFolders(projectPath: path, unityPath: unityPathOverride ?? detectedUnityPath)
-
         let groups = listAddressableGroups(projectPath: path)
-        return ProjectInfo(projectPath: path, unityVersion: unityVersion, groups: groups, error: nil)
+        let needsScan = !findCandidateModFolders(projectPath: path, knownGroupNames: groups).isEmpty
+        return ProjectInfo(projectPath: path, unityVersion: unityVersion, groups: groups, error: nil, scanning: needsScan)
+    }
+
+    /// Runs the (possibly slow) auto-register pass and returns the refreshed group
+    /// list. Call only after resolveProjectFast() reported `scanning: true`.
+    static func scanForNewGroups(projectPath: String, unityPath: String?) async -> [String] {
+        await autoRegisterNewModFolders(projectPath: projectPath, unityPath: unityPath)
+        return listAddressableGroups(projectPath: projectPath)
     }
 
     /// Runs Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine, which
@@ -62,12 +74,14 @@ enum ProjectService {
             "-projectPath", projectPath,
             "-executeMethod", "Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine",
         ]
-        _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int32, Never>) in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: unityPath)
-            process.arguments = args
-            process.terminationHandler = { proc in continuation.resume(returning: proc.terminationStatus) }
-            do { try process.run() } catch { continuation.resume(returning: -1) }
+        await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) {
+            _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int32, Never>) in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: unityPath)
+                process.arguments = args
+                process.terminationHandler = { proc in continuation.resume(returning: proc.terminationStatus) }
+                do { try process.run() } catch { continuation.resume(returning: -1) }
+            }
         }
     }
 

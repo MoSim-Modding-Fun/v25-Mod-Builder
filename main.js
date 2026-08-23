@@ -159,9 +159,22 @@ async function autoRegisterNewModFolders(projectPath, unityPath) {
   ]);
 }
 
-// Shared by the dialog-driven picker and by restoring the last-used project on
-// launch, so "select a project" and "reopen the remembered one" can't drift apart.
-async function resolveProject(projectPath) {
+// The project the renderer most recently asked to load - lets a slow background scan
+// (see below) tell whether its result is still relevant before pushing it, in case the
+// user picked a different project while the scan was running.
+let currentProjectPath = null;
+
+// Fast, synchronous-only project read: no Unity launch, so the UI can populate
+// immediately instead of blocking on autoRegisterNewModFolders (which can take real
+// wall-clock time - launching Unity headless). Shared by the dialog-driven picker and
+// by restoring the last-used project on launch, so they can't drift apart.
+function resolveProjectFast(projectPath) {
+  // A trailing slash (the folder picker can hand back either form depending on
+  // platform/GTK version) would otherwise make the same project look like two
+  // different keys to the per-projectPath Unity launch queue below, letting two
+  // Unity instances race for the same project's lock file after all.
+  projectPath = path.resolve(projectPath);
+
   const assetsDir = path.join(projectPath, 'Assets');
   const versionFile = path.join(projectPath, 'ProjectSettings', 'ProjectVersion.txt');
   if (!fs.existsSync(assetsDir) || !fs.existsSync(versionFile)) {
@@ -176,21 +189,48 @@ async function resolveProject(projectPath) {
   }
 
   const detectedUnityPath = unityVersion ? detectUnity(unityVersion) : null;
-  const settings = loadSettings();
-
-  await autoRegisterNewModFolders(projectPath, settings.unityPathOverride || detectedUnityPath);
-
   const groups = listAddressableGroups(projectPath);
+  const needsScan = findCandidateModFolders(projectPath, groups).length > 0;
+
+  return { projectPath, unityVersion, groups, detectedUnityPath, scanning: needsScan };
+}
+
+// Runs after the fast result is already on screen: does the (possibly slow) Unity
+// auto-register pass, then pushes any newly-discovered groups to the renderer. Ignored
+// if the user has since loaded a different project.
+async function scanForNewGroupsInBackground(projectPath, unityPath) {
+  await autoRegisterNewModFolders(projectPath, unityPath);
+  if (projectPath !== currentProjectPath || !mainWindow) return;
+  mainWindow.webContents.send('project-scan-complete', {
+    projectPath,
+    groups: listAddressableGroups(projectPath),
+  });
+}
+
+function loadProject(rawProjectPath) {
+  const fast = resolveProjectFast(rawProjectPath);
+  if (fast.error) return fast;
+
+  // fast.projectPath is normalized (see resolveProjectFast) - use it from here on, not
+  // rawProjectPath, or a trailing-slash difference would make the background scan use a
+  // different Unity-launch-queue key than a later build for the same project.
+  const projectPath = fast.projectPath;
+  currentProjectPath = projectPath;
+  const settings = loadSettings();
   settings.projectPath = projectPath;
   saveSettings(settings);
 
-  return { projectPath, unityVersion, groups, detectedUnityPath };
+  if (fast.scanning) {
+    scanForNewGroupsInBackground(projectPath, settings.unityPathOverride || fast.detectedUnityPath);
+  }
+
+  return fast;
 }
 
 ipcMain.handle('select-project', async () => {
   const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
   if (result.canceled || result.filePaths.length === 0) return null;
-  return resolveProject(result.filePaths[0]);
+  return loadProject(result.filePaths[0]);
 });
 
 // Restores the project remembered from the last session (settings.json, in the OS's
@@ -200,7 +240,7 @@ ipcMain.handle('load-project', (_event, projectPath) => {
   if (!fs.existsSync(projectPath)) {
     return { error: `Remembered project "${projectPath}" no longer exists.` };
   }
-  return resolveProject(projectPath);
+  return loadProject(projectPath);
 });
 
 ipcMain.handle('browse-unity-path', async () => {
@@ -356,7 +396,10 @@ function tailLogFile(logFile, onLine, intervalMs = 300) {
 }
 
 ipcMain.handle('run-build', async (event, config) => {
-  const { projectPath, unityPath, groups, platforms } = config;
+  // Normalized the same way as resolveProjectFast() so this always matches the queue
+  // key an in-flight auto-register scan for the same project is using.
+  const projectPath = path.resolve(config.projectPath);
+  const { unityPath, groups, platforms } = config;
 
   const logDir = path.join(projectPath, 'Tools', 'build-logs');
   fs.mkdirSync(logDir, { recursive: true });

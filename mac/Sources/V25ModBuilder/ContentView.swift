@@ -32,10 +32,11 @@ struct ContentView: View {
         .frame(minWidth: 420, minHeight: 260)
         .onAppear {
             resizeForCurrentPage()
-            Task { await appState.restoreLastProject() }
+            appState.restoreLastProject()
         }
         .onChange(of: page) { _ in resizeForCurrentPage() }
         .onChange(of: appState.groups) { _ in if page == 1 || page == 2 { resizeForCurrentPage() } }
+        .onChange(of: appState.isScanningForNewGroups) { _ in if page == 0 { resizeForCurrentPage() } }
         .onChange(of: appState.selectedPlatforms) { _ in if page != 0 { resizeForCurrentPage() } }
         .onChange(of: appState.releaseEnabled) { _ in if page == 2 { resizeForCurrentPage() } }
         .onChange(of: runner.currentPlatform) { newValue in

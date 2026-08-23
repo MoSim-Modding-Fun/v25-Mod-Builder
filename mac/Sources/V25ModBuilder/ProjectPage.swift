@@ -10,7 +10,7 @@ struct ProjectPage: View {
             RufusGroupBox(title: "Project") {
                 HStack(spacing: 4) {
                     RufusField(text: appState.projectPath ?? "", placeholder: "No project selected")
-                    Button("SELECT") { Task { await appState.selectProject() } }
+                    Button("SELECT") { appState.selectProject() }
                         .buttonStyle(RufusButtonStyle())
                 }
                 if let error = appState.projectError {
@@ -21,6 +21,14 @@ struct ProjectPage: View {
                     Text("Editor version required: \(version) \u{00B7} \(appState.groups.count) group(s) found")
                         .font(.system(size: 11))
                         .foregroundColor(Theme.dim)
+                }
+                if appState.isScanningForNewGroups {
+                    HStack(spacing: 5) {
+                        ProgressView().scaleEffect(0.4).frame(width: 10, height: 10)
+                        Text("Scanning for new mod folders\u{2026}")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.dim)
+                    }
                 }
             }
 

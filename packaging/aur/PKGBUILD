@@ -1,0 +1,41 @@
+# Maintainer: seb <seb@sebastianw.tech>
+pkgname=v25-mod-builder-bin
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="GUI for building and exporting MoSimulator addressable mod groups"
+arch=('x86_64')
+url="https://github.com/MoSim-Modding-Fun/v25-Mod-Builder"
+license=('UNLICENSE')
+provides=('v25-mod-builder')
+conflicts=('v25-mod-builder')
+depends=('gtk3' 'nss' 'libxss' 'libxtst' 'alsa-lib')
+options=('!strip')
+# GitHub dot-encodes spaces in release asset filenames ("Mod Builder..." ->
+# "Mod.Builder...") - this is the literal browser_download_url, not a guess.
+source=("$pkgname-$pkgver.AppImage::$url/releases/download/v$pkgver/Mod.Builder.Installer.Linux.AppImage")
+sha256sums=('18ad050154ecd13c58f138b0f8bea743ca53764904b6db8198cbb5cac9ee6544')
+
+build() {
+  cd "$srcdir"
+  chmod +x "$pkgname-$pkgver.AppImage"
+  "./$pkgname-$pkgver.AppImage" --appimage-extract >/dev/null
+}
+
+package() {
+  cd "$srcdir"
+
+  install -d "$pkgdir/opt/$pkgname"
+  cp -r squashfs-root/* "$pkgdir/opt/$pkgname/"
+  # AppRun launches the bundled electron binary directly - no sandbox helper setup
+  # needed since this isn't running as a privileged/multi-user service.
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/$pkgname" <<EOF
+#!/bin/sh
+exec /opt/$pkgname/AppRun "\$@"
+EOF
+
+  install -Dm644 squashfs-root/*.desktop "$pkgdir/usr/share/applications/$pkgname.desktop"
+  sed -i "s|^Exec=.*|Exec=$pkgname|; s|^Icon=.*|Icon=$pkgname|" \
+    "$pkgdir/usr/share/applications/$pkgname.desktop"
+
+  install -Dm644 squashfs-root/*.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+}

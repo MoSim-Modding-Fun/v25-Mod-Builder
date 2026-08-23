@@ -12,6 +12,7 @@ final class AppState: ObservableObject {
     @Published var unityVersion: String?
     @Published var projectError: String?
     @Published var groups: [ModGroup] = []
+    @Published var isScanningForNewGroups = false
 
     @Published var unityPath: String?
     @Published var detectedUnityPath: String?
@@ -44,7 +45,7 @@ final class AppState: ObservableObject {
 
     /// Called once on launch - restores the remembered project/paths, same as the
     /// Electron app's startup `loadSettings().then(...)` block.
-    func restoreLastProject() async {
+    func restoreLastProject() {
         guard projectPath == nil else { return } // avoid re-running on every view re-appear
 
         if let override = defaults.string(forKey: Keys.unityPathOverride) {
@@ -54,23 +55,51 @@ final class AppState: ObservableObject {
             outputDir = dir
         }
         if let path = defaults.string(forKey: Keys.projectPath) {
-            applyProject(await ProjectService.resolveProject(at: path, unityPathOverride: unityPath))
+            loadProject(at: path)
         }
     }
 
-    func selectProject() async {
+    func selectProject() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        applyProject(await ProjectService.resolveProject(at: url.path, unityPathOverride: unityPath))
+        loadProject(at: url.path)
+    }
+
+    /// Populates the UI immediately from the fast, filesystem-only read, then - only if
+    /// needed - runs the slower Unity auto-register scan in the background and merges
+    /// in any newly-discovered groups when it finishes. Mirrors main.js's
+    /// loadProject()/scanForNewGroupsInBackground() split, so a slow scan (launching
+    /// Unity headless) never blocks the initial "project selected" feedback.
+    private func loadProject(at rawPath: String) {
+        let info = ProjectService.resolveProjectFast(at: rawPath)
+        applyProject(info)
+
+        guard info.error == nil, info.scanning else { return }
+        // Use info.projectPath (normalized by resolveProjectFast), not rawPath - they
+        // can differ by a trailing slash, which would make the `self.projectPath ==
+        // path` check below always fail and silently drop every scan result.
+        let path = info.projectPath
+        let scanUnityPath = unityPath
+        Task {
+            let refreshedGroups = await ProjectService.scanForNewGroups(projectPath: path, unityPath: scanUnityPath)
+            // The user may have loaded a different project while this scan was running -
+            // only apply the result if it's still the one on screen.
+            guard self.projectPath == path else { return }
+            self.isScanningForNewGroups = false
+            let existingNames = Set(self.groups.map(\.name))
+            guard Set(refreshedGroups) != existingNames else { return }
+            self.groups = refreshedGroups.map { ModGroup(name: $0) }
+        }
     }
 
     private func applyProject(_ info: ProjectInfo) {
         projectPath = info.projectPath
         unityVersion = info.unityVersion
         projectError = info.error
+        isScanningForNewGroups = info.scanning
 
         if info.error == nil {
             defaults.set(info.projectPath, forKey: Keys.projectPath)
