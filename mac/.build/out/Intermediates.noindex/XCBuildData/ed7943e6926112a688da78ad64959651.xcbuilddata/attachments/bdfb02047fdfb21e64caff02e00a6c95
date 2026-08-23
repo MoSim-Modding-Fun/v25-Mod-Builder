@@ -1,0 +1,109 @@
+{
+  "" : {
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/V25ModBuilder-primary.dia",
+    "emit-module-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/V25ModBuilder-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/V25ModBuilder-primary-emit-module.dia",
+    "pch" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/V25ModBuilder-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/V25ModBuilder-primary.swiftdeps"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/App.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/App~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/AppState.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/AppState~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/BuildPage.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildPage~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/BuildRunner.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/BuildRunner~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/ContentView.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/GroupsPage.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/GroupsPage~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/Models.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Models~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/ProjectPage.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectPage~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/ProjectService.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/ProjectService~partial.swiftmodule"
+  },
+  "/Users/mister-e/Desktop/v25-Mod-Builder/mac/Sources/V25ModBuilder/Theme.swift" : {
+    "const-values" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.swiftconstvalues",
+    "dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.d",
+    "diagnostics" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.dia",
+    "index-unit-output-path" : "/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.o",
+    "llvm-bc" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.bc",
+    "object" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.o",
+    "swift-dependencies" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme.swiftdeps",
+    "swiftmodule" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac/.build/out/Intermediates.noindex/V25ModBuilder.build/Debug/V25ModBuilder-p.build/Objects-normal/arm64/Theme~partial.swiftmodule"
+  }
+}

@@ -11,6 +11,9 @@ final class BuildRunner: ObservableObject {
     @Published var platformStatus: [PlatformTarget: SegmentStatus] = [:]
     @Published var progressSegments: [ProgressSegment] = []
     @Published var isRunning = false
+    /// The platform currently building - the view follows this to auto-switch the
+    /// console tab as each platform finishes and the next one starts.
+    @Published var currentPlatform: PlatformTarget?
 
     private let failureMarkers = [
         "error CS",
@@ -51,6 +54,7 @@ final class BuildRunner: ObservableObject {
 
         for platform in platforms {
             platformStatus[platform] = .running
+            currentPlatform = platform
 
             let logFile = (logDir as NSString).appendingPathComponent("build-\(platform.rawValue).log")
             try? FileManager.default.removeItem(atPath: logFile)

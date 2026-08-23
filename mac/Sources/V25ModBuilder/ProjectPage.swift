@@ -41,8 +41,6 @@ struct ProjectPage: View {
                         .foregroundColor(Theme.error)
                 }
             }
-
-            Spacer()
         }
     }
 }

@@ -1,0 +1,4 @@
+Target dependency graph (2 targets)
+Target 'AllExcludingTests' in project 'Aggregate'
+➜ Explicit dependency on target 'V25ModBuilder-product' in project 'V25ModBuilder'
+Target 'V25ModBuilder-product' in project 'V25ModBuilder' (no dependencies)

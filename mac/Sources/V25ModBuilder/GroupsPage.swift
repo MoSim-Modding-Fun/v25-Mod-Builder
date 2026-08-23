@@ -76,8 +76,6 @@ struct GroupsPage: View {
             RufusGroupBox(title: "Preview") {
                 previewList
             }
-
-            Spacer()
         }
     }
 

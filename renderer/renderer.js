@@ -470,6 +470,9 @@ window.api.onBuildProgress((data) => {
     badge.textContent = data.status;
     badge.className = `badge ${data.status}`;
   }
+  // Follow the build: jump the console to whichever platform just started, so the
+  // next platform's output is visible as soon as it begins without a manual click.
+  if (data.status === 'running') activateConsoleTab(data.target);
 });
 
 // Unity's raw -logFile output, streamed live while the build runs (see main.js's

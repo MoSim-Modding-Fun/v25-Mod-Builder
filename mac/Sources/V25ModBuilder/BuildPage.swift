@@ -27,8 +27,6 @@ struct BuildPage: View {
                 }
                 ConsoleView(lines: runner.consoleLines[activeTab] ?? [])
             }
-
-            Spacer()
         }
     }
 
