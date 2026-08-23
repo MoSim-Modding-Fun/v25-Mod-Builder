@@ -247,6 +247,20 @@ input[type="text"]::placeholder {
   gap: 4px;
 }
 
+.checkbox-row {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.release-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .status-row {
   display: flex;
   flex-wrap: wrap;

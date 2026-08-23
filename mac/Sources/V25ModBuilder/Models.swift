@@ -39,6 +39,20 @@ enum SegmentStatus: String {
     case pending, running, success, failed
 }
 
+/// Identifies a console/status tab on the Build page: either a real platform build or
+/// the synthetic GitHub release step tacked on after them.
+enum ConsoleTabID: Hashable {
+    case platform(PlatformTarget)
+    case release
+
+    var displayName: String {
+        switch self {
+        case .platform(let p): return p.displayName
+        case .release: return "Release"
+        }
+    }
+}
+
 struct ProgressSegment: Identifiable, Equatable {
     let id = UUID()
     let platform: PlatformTarget

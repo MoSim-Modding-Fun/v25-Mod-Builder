@@ -20,6 +20,11 @@ final class AppState: ObservableObject {
 
     @Published var selectedPlatforms: Set<PlatformTarget> = [.win64, .osx, .linux64]
 
+    @Published var releaseEnabled = false
+    @Published var releaseTag = ""
+    @Published var releaseTitle = ""
+    @Published var releaseNotes = ""
+
     private let defaults = UserDefaults.standard
     private enum Keys {
         static let projectPath = "projectPath"
@@ -33,9 +38,13 @@ final class AppState: ObservableObject {
         projectPath != nil && unityPath != nil && groups.contains(where: { $0.checked }) && !selectedPlatforms.isEmpty
     }
 
+    var canStartBuild: Bool {
+        canBuild && (!releaseEnabled || !releaseTag.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
+
     /// Called once on launch - restores the remembered project/paths, same as the
     /// Electron app's startup `loadSettings().then(...)` block.
-    func restoreLastProject() {
+    func restoreLastProject() async {
         guard projectPath == nil else { return } // avoid re-running on every view re-appear
 
         if let override = defaults.string(forKey: Keys.unityPathOverride) {
@@ -45,17 +54,17 @@ final class AppState: ObservableObject {
             outputDir = dir
         }
         if let path = defaults.string(forKey: Keys.projectPath) {
-            applyProject(ProjectService.resolveProject(at: path))
+            applyProject(await ProjectService.resolveProject(at: path, unityPathOverride: unityPath))
         }
     }
 
-    func selectProject() {
+    func selectProject() async {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        applyProject(ProjectService.resolveProject(at: url.path))
+        applyProject(await ProjectService.resolveProject(at: url.path, unityPathOverride: unityPath))
     }
 
     private func applyProject(_ info: ProjectInfo) {

@@ -8,12 +8,21 @@ let consolePanelsByPlatform = {}; // platformKey -> panel element
 let activeConsoleTab = null;
 let progressSegments = []; // [{ platform, group, zipName, version, status }], one per (group x platform)
 
-const PAGE_IDS = ['page-project', 'page-groups', 'page-build'];
+const PAGE_IDS = ['page-project', 'page-groups', 'page-output', 'page-build'];
 let currentPage = 0;
 
 // Must match PLATFORM_TARGETS' labels in main.js, which is what the Unity-side
 // exporter actually uses to name the zip.
 const PLATFORM_LABELS = { win64: 'Windows', osx: 'MacOS', linux64: 'Linux' };
+
+// Synthetic "platform" key for the GitHub release step's own status badge/console tab,
+// so it can reuse the exact same badge/console-tab machinery as a real platform build.
+const RELEASE_KEY = 'release';
+const RELEASE_LABEL = 'Release';
+
+// Must match main.js's GITHUB_RELEASE_REPO - shown to the user so it's clear which
+// repo a release actually targets before they click START.
+const GITHUB_RELEASE_REPO = 'MoSim-Modding-Fun/MoSim-Reefscape-Public';
 
 const els = {
   selectProjectBtn: document.getElementById('select-project-btn'),
@@ -36,7 +45,15 @@ const els = {
   outputPathField: document.getElementById('output-path-field'),
   chooseOutputBtn: document.getElementById('choose-output-btn'),
   resetOutputBtn: document.getElementById('reset-output-btn'),
+  releaseEnabledCheck: document.getElementById('release-enabled-check'),
+  releaseFields: document.getElementById('release-fields'),
+  releaseTagField: document.getElementById('release-tag-field'),
+  releaseTitleField: document.getElementById('release-title-field'),
+  releaseNotesField: document.getElementById('release-notes-field'),
+  releaseRepoInfo: document.getElementById('release-repo-info'),
 };
+
+els.releaseRepoInfo.textContent = `Releases to ${GITHUB_RELEASE_REPO} via the local gh CLI.`;
 
 // ---------- Wizard paging (Etcher-style: one primary action per step) ----------
 
@@ -57,15 +74,21 @@ function updateNav() {
   const projectReady = Boolean(projectPath && unityPath);
   const anyGroupSelected = Object.values(groupsState).some((g) => g.checked);
   const anyPlatformSelected = getSelectedPlatforms().length > 0;
+  const buildReady = projectReady && anyGroupSelected && anyPlatformSelected;
+  const releaseReady = !els.releaseEnabledCheck.checked || els.releaseTagField.value.trim().length > 0;
 
   if (currentPage === 0) {
     els.nextBtn.style.display = '';
     els.buildBtn.style.display = 'none';
     els.nextBtn.disabled = !projectReady;
   } else if (currentPage === 1) {
+    els.nextBtn.style.display = '';
+    els.buildBtn.style.display = 'none';
+    els.nextBtn.disabled = !buildReady;
+  } else if (currentPage === 2) {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = '';
-    els.buildBtn.disabled = !(projectReady && anyGroupSelected && anyPlatformSelected);
+    els.buildBtn.disabled = !(buildReady && releaseReady);
   } else {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = 'none';
@@ -275,6 +298,14 @@ function getSelectedPlatforms() {
 
 document.querySelectorAll('.platform-check').forEach((el) => el.addEventListener('change', updateNav));
 
+// ---------- GitHub release ----------
+
+els.releaseEnabledCheck.addEventListener('change', () => {
+  els.releaseFields.style.display = els.releaseEnabledCheck.checked ? 'flex' : 'none';
+  updateNav();
+});
+els.releaseTagField.addEventListener('input', updateNav);
+
 // ---------- Build ----------
 
 els.buildBtn.addEventListener('click', async () => {
@@ -282,8 +313,9 @@ els.buildBtn.addEventListener('click', async () => {
     .filter(([, g]) => g.checked)
     .map(([name, g]) => ({ name, version: g.version, zipName: g.zipName }));
   const platforms = getSelectedPlatforms();
+  const releaseEnabled = els.releaseEnabledCheck.checked;
 
-  renderConsoleTabs(platforms);
+  renderConsoleTabs(releaseEnabled ? [...platforms, RELEASE_KEY] : platforms);
   renderProgressSegments(selectedGroups, platforms);
 
   els.buildStatus.innerHTML = '';
@@ -293,20 +325,65 @@ els.buildBtn.addEventListener('click', async () => {
     row.innerHTML = `<span>${PLATFORM_LABELS[p]}</span> <span class="badge pending" id="badge-${p}">pending</span>`;
     els.buildStatus.appendChild(row);
   }
+  if (releaseEnabled) {
+    const row = document.createElement('div');
+    row.className = 'platform-row';
+    row.innerHTML = `<span>${RELEASE_LABEL}</span> <span class="badge pending" id="badge-${RELEASE_KEY}">pending</span>`;
+    els.buildStatus.appendChild(row);
+  }
 
-  showPage(2); // jump to the Build page so progress is visible immediately
+  showPage(PAGE_IDS.length - 1); // jump to the Build page so progress is visible immediately
 
   const results = await window.api.runBuild({ projectPath, unityPath, groups: selectedGroups, platforms, outputDir });
 
+  const outputPaths = [];
+  let allSucceeded = true;
   for (const r of results) {
     appendConsoleLine(r.target, `=== ${r.target} : ${r.status.toUpperCase()} ===`, r.status === 'success' ? 'summary-success' : 'summary-failed');
     if (r.reason) appendConsoleLine(r.target, `Reason: ${r.reason}`, 'summary-failed');
     if (r.status === 'success' && r.outputPaths) {
       for (const p of r.outputPaths) appendConsoleLine(r.target, p, 'summary-success');
+      outputPaths.push(...r.outputPaths);
     }
     appendConsoleLine(r.target, 'Full history logged to Tools/build-logs/modbuilder.log in the project.');
+    if (r.status !== 'success') allSucceeded = false;
+  }
+
+  if (releaseEnabled && allSucceeded && outputPaths.length > 0) {
+    await runGitHubRelease(outputPaths);
+  } else if (releaseEnabled && !allSucceeded) {
+    const badge = document.getElementById(`badge-${RELEASE_KEY}`);
+    if (badge) { badge.textContent = 'skipped'; badge.className = 'badge failed'; }
+    appendConsoleLine(RELEASE_KEY, 'Skipped: not every platform built successfully.', 'summary-failed');
   }
 });
+
+async function runGitHubRelease(files) {
+  activateConsoleTab(RELEASE_KEY);
+  const badge = document.getElementById(`badge-${RELEASE_KEY}`);
+  if (badge) { badge.textContent = 'running'; badge.className = 'badge running'; }
+  appendConsoleLine(RELEASE_KEY, `Creating GitHub release on ${GITHUB_RELEASE_REPO}...`);
+
+  const result = await window.api.createGitHubRelease({
+    tag: els.releaseTagField.value.trim(),
+    title: els.releaseTitleField.value.trim(),
+    notes: els.releaseNotesField.value.trim(),
+    files,
+  });
+
+  for (const line of (result.output || '').split('\n')) {
+    if (line.trim()) appendConsoleLine(RELEASE_KEY, line, result.status === 'success' ? 'summary-success' : 'summary-failed');
+  }
+  if (badge) {
+    badge.textContent = result.status;
+    badge.className = `badge ${result.status}`;
+  }
+  appendConsoleLine(
+    RELEASE_KEY,
+    result.status === 'success' ? `=== RELEASE : SUCCESS ===` : `=== RELEASE : FAILED ===`,
+    result.status === 'success' ? 'summary-success' : 'summary-failed'
+  );
+}
 
 // ---------- Console tabs (one per platform being built) ----------
 
@@ -321,7 +398,7 @@ function renderConsoleTabs(platforms) {
     const tab = document.createElement('button');
     tab.type = 'button';
     tab.className = 'console-tab';
-    tab.textContent = PLATFORM_LABELS[p];
+    tab.textContent = p === RELEASE_KEY ? RELEASE_LABEL : PLATFORM_LABELS[p];
     tab.addEventListener('click', () => activateConsoleTab(p));
     els.consoleTabs.appendChild(tab);
 
@@ -346,8 +423,9 @@ function renderConsoleTabs(platforms) {
 
 function activateConsoleTab(platformKey) {
   activeConsoleTab = platformKey;
+  const label = platformKey === RELEASE_KEY ? RELEASE_LABEL : PLATFORM_LABELS[platformKey];
   Array.from(els.consoleTabs.children).forEach((tab) => {
-    tab.classList.toggle('active', tab.textContent === PLATFORM_LABELS[platformKey]);
+    tab.classList.toggle('active', tab.textContent === label);
   });
   Object.entries(consolePanelsByPlatform).forEach(([p, panel]) => {
     panel.classList.toggle('active', p === platformKey);

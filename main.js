@@ -123,9 +123,45 @@ function listAddressableGroups(projectPath) {
 
 ipcMain.handle('load-settings', () => loadSettings());
 
+// Folder that holds one subfolder per mod (robot(s) + modpack metadata) - must match
+// AddressablesModExporter.cs's RobotsRoot constant exactly.
+const ROBOTS_ROOT_REL = ['Assets', 'Prefabs', 'Reefscape', 'Robots', 'Mods'];
+
+// Cheap filesystem-only pre-check so a normal project select stays instant; Unity only
+// gets launched (slow) when there's actually a subfolder not already used by some
+// group's entry. Name-matching here is just an optimization, not the correctness
+// check - AutoRegisterModGroups on the Unity side re-checks by folder GUID against
+// every group's real entries, so a stale/mismatched group name can at worst trigger an
+// unnecessary (harmless) Unity launch, never a duplicate group.
+function findCandidateModFolders(projectPath, knownGroupNames) {
+  const robotsRoot = path.join(projectPath, ...ROBOTS_ROOT_REL);
+  if (!fs.existsSync(robotsRoot)) return [];
+  const known = new Set(knownGroupNames);
+  return fs.readdirSync(robotsRoot, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !known.has(e.name))
+    .map((e) => e.name);
+}
+
+// Runs Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine, which scans
+// RobotsRoot for folders with a robot that can actually load and spawn (RobotPrefab +
+// MainMenuPrefab both set on some RobotMetadataSO) and turns any new ones into a proper
+// Addressable mod group + modpack metadata asset. Best-effort: any failure here just
+// means new folders won't show up as groups yet, not a fatal project-load error.
+async function autoRegisterNewModFolders(projectPath, unityPath) {
+  if (!unityPath || !fs.existsSync(unityPath)) return;
+  const candidates = findCandidateModFolders(projectPath, listAddressableGroups(projectPath));
+  if (candidates.length === 0) return;
+
+  await runUnityBuild(unityPath, [
+    '-batchmode', '-quit', '-nographics',
+    '-projectPath', projectPath,
+    '-executeMethod', 'Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine',
+  ]);
+}
+
 // Shared by the dialog-driven picker and by restoring the last-used project on
 // launch, so "select a project" and "reopen the remembered one" can't drift apart.
-function resolveProject(projectPath) {
+async function resolveProject(projectPath) {
   const assetsDir = path.join(projectPath, 'Assets');
   const versionFile = path.join(projectPath, 'ProjectSettings', 'ProjectVersion.txt');
   if (!fs.existsSync(assetsDir) || !fs.existsSync(versionFile)) {
@@ -139,10 +175,12 @@ function resolveProject(projectPath) {
     return { error: `Couldn't read ProjectVersion.txt: ${err.message}` };
   }
 
-  const groups = listAddressableGroups(projectPath);
   const detectedUnityPath = unityVersion ? detectUnity(unityVersion) : null;
-
   const settings = loadSettings();
+
+  await autoRegisterNewModFolders(projectPath, settings.unityPathOverride || detectedUnityPath);
+
+  const groups = listAddressableGroups(projectPath);
   settings.projectPath = projectPath;
   saveSettings(settings);
 
@@ -402,4 +440,35 @@ ipcMain.handle('run-build', async (event, config) => {
   }
 
   return results;
+});
+
+// ---------- IPC: GitHub release ----------
+
+// Always releases to this repo - the Unity project the built mods actually come from,
+// not the mod-builder tool's own repo. Uses the user's local `gh` CLI (already
+// authenticated via `gh auth login`) rather than managing a token in-app.
+const GITHUB_RELEASE_REPO = 'MoSim-Modding-Fun/MoSim-Reefscape-Public';
+
+function runGh(args) {
+  return new Promise((resolve) => {
+    const proc = spawn('gh', args, { windowsHide: false });
+    let output = '';
+    proc.stdout.on('data', (d) => { output += d; });
+    proc.stderr.on('data', (d) => { output += d; });
+    proc.on('error', (err) => resolve({ code: -1, output: output + err.message }));
+    proc.on('exit', (code) => resolve({ code, output }));
+  });
+}
+
+ipcMain.handle('create-github-release', async (_event, config) => {
+  const { tag, title, notes, files } = config;
+  if (!tag || !tag.trim()) return { status: 'failed', output: 'No release tag given.' };
+  if (!files || files.length === 0) return { status: 'failed', output: 'No build output to attach.' };
+
+  const args = ['release', 'create', tag.trim(), ...files, '--repo', GITHUB_RELEASE_REPO];
+  args.push('--title', title && title.trim() ? title.trim() : tag.trim());
+  args.push('--notes', notes && notes.trim() ? notes.trim() : `Built by v25 Mod Builder.`);
+
+  const { code, output } = await runGh(args);
+  return { status: code === 0 ? 'success' : 'failed', output };
 });

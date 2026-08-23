@@ -10,7 +10,7 @@ struct ProjectPage: View {
             RufusGroupBox(title: "Project") {
                 HStack(spacing: 4) {
                     RufusField(text: appState.projectPath ?? "", placeholder: "No project selected")
-                    Button("SELECT") { appState.selectProject() }
+                    Button("SELECT") { Task { await appState.selectProject() } }
                         .buttonStyle(RufusButtonStyle())
                 }
                 if let error = appState.projectError {

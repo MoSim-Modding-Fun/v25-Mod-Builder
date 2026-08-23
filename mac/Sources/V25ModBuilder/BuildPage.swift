@@ -4,11 +4,17 @@ import SwiftUI
 /// progress bar with percentage, and the per-platform console tabs.
 struct BuildPage: View {
     @ObservedObject var runner: BuildRunner
-    @Binding var activeTab: PlatformTarget
+    @Binding var activeTab: ConsoleTabID
     @EnvironmentObject var appState: AppState
 
     private var activePlatforms: [PlatformTarget] {
         PlatformTarget.allCases.filter { appState.selectedPlatforms.contains($0) }
+    }
+
+    private var activeTabs: [ConsoleTabID] {
+        var tabs = activePlatforms.map { ConsoleTabID.platform($0) }
+        if appState.releaseEnabled { tabs.append(.release) }
+        return tabs
     }
 
     var body: some View {
@@ -20,13 +26,20 @@ struct BuildPage: View {
 
             RufusGroupBox(title: "Console") {
                 HStack(spacing: 2) {
-                    ForEach(activePlatforms) { platform in
-                        Button(platform.displayName) { activeTab = platform }
-                            .buttonStyle(ConsoleTabButtonStyle(active: activeTab == platform))
+                    ForEach(activeTabs, id: \.self) { tab in
+                        Button(tab.displayName) { activeTab = tab }
+                            .buttonStyle(ConsoleTabButtonStyle(active: activeTab == tab))
                     }
                 }
-                ConsoleView(lines: runner.consoleLines[activeTab] ?? [])
+                ConsoleView(lines: consoleLines(for: activeTab))
             }
+        }
+    }
+
+    private func consoleLines(for tab: ConsoleTabID) -> [ConsoleLine] {
+        switch tab {
+        case .platform(let p): return runner.consoleLines[p] ?? []
+        case .release: return runner.releaseConsoleLines
         }
     }
 
@@ -38,6 +51,18 @@ struct BuildPage: View {
                     Text((runner.platformStatus[platform] ?? .pending).rawValue.uppercased())
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(badgeColor(runner.platformStatus[platform] ?? .pending))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.white)
+                .overlay(Rectangle().stroke(Theme.badgeBorder, lineWidth: 1))
+            }
+            if appState.releaseEnabled {
+                HStack(spacing: 4) {
+                    Text("Release").font(.system(size: 11))
+                    Text(runner.releaseStatus.rawValue.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(badgeColor(runner.releaseStatus))
                 }
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

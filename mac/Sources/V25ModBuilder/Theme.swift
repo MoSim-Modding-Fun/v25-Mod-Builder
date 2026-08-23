@@ -85,6 +85,25 @@ struct RufusField: View {
     }
 }
 
+/// An editable text field matching CSS's `input[type="text"]:not(.field)` - flat white
+/// background, square-ish `#7a7a7a` border, no native rounded-border chrome - used for
+/// every editable text input (Version/Zip overrides, release tag/title/notes) so they
+/// read as the same custom-styled control as the rest of the app, not stock SwiftUI.
+struct RufusEditableField: View {
+    @Binding var text: String
+    let placeholder: String
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .textFieldStyle(.plain)
+            .font(.system(size: 11))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+            .background(Color.white)
+            .overlay(Rectangle().stroke(Theme.fieldBorder, lineWidth: 1))
+    }
+}
+
 /// The default gray-gradient Windows-95-descended button look (BACK, SELECT, "...").
 struct RufusButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

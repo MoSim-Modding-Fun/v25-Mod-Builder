@@ -5,11 +5,11 @@
       "name" : "V25ModBuilder",
       "path" : "/Users/mister-e/Desktop/v25-Mod-Builder/mac",
       "projects" : [
-        "b0de30b4b21d9531d9654180e5412783077f1866c998753dcda0588118df0847",
+        "1b9e1781d1311e472855849db90f103ad7d5c9cf5160abce8a76d671ede632b5",
         "94e9cb1a0e66947f922509010835e4813bbbd0bc6f78a1b93d7f90998b08a570"
       ]
     },
-    "signature" : "eb36a2d7e398f068e996a423789fbad3e9590b369b256ab9884eae481dad9956",
+    "signature" : "e977d0fd4d3973a67f307e18800ed5c9da33422baa8d59d05b4f4fcf4134c7c1",
     "type" : "workspace"
   },
   {
@@ -257,6 +257,14 @@
               {
                 "fileType" : "sourcecode.swift",
                 "guid" : "PACKAGE:mac::MAINGROUP::REF_2::REF_7",
+                "name" : "OutputPage.swift",
+                "path" : "OutputPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:mac::MAINGROUP::REF_2::REF_8",
                 "name" : "ProjectPage.swift",
                 "path" : "ProjectPage.swift",
                 "sourceTree" : "<group>",
@@ -264,7 +272,7 @@
               },
               {
                 "fileType" : "sourcecode.swift",
-                "guid" : "PACKAGE:mac::MAINGROUP::REF_2::REF_8",
+                "guid" : "PACKAGE:mac::MAINGROUP::REF_2::REF_9",
                 "name" : "ProjectService.swift",
                 "path" : "ProjectService.swift",
                 "sourceTree" : "<group>",
@@ -272,7 +280,7 @@
               },
               {
                 "fileType" : "sourcecode.swift",
-                "guid" : "PACKAGE:mac::MAINGROUP::REF_2::REF_9",
+                "guid" : "PACKAGE:mac::MAINGROUP::REF_2::REF_10",
                 "name" : "Theme.swift",
                 "path" : "Theme.swift",
                 "sourceTree" : "<group>",
@@ -346,6 +354,14 @@
               {
                 "fileType" : "sourcecode.swift",
                 "guid" : "PACKAGE:mac::MAINGROUP::REF_3::REF_7",
+                "name" : "OutputPage.swift",
+                "path" : "OutputPage.swift",
+                "sourceTree" : "<group>",
+                "type" : "file"
+              },
+              {
+                "fileType" : "sourcecode.swift",
+                "guid" : "PACKAGE:mac::MAINGROUP::REF_3::REF_8",
                 "name" : "ProjectPage.swift",
                 "path" : "ProjectPage.swift",
                 "sourceTree" : "<group>",
@@ -353,7 +369,7 @@
               },
               {
                 "fileType" : "sourcecode.swift",
-                "guid" : "PACKAGE:mac::MAINGROUP::REF_3::REF_8",
+                "guid" : "PACKAGE:mac::MAINGROUP::REF_3::REF_9",
                 "name" : "ProjectService.swift",
                 "path" : "ProjectService.swift",
                 "sourceTree" : "<group>",
@@ -361,7 +377,7 @@
               },
               {
                 "fileType" : "sourcecode.swift",
-                "guid" : "PACKAGE:mac::MAINGROUP::REF_3::REF_9",
+                "guid" : "PACKAGE:mac::MAINGROUP::REF_3::REF_10",
                 "name" : "Theme.swift",
                 "path" : "Theme.swift",
                 "sourceTree" : "<group>",
@@ -387,12 +403,12 @@
       "projectIsPackage" : "true",
       "projectName" : "V25ModBuilder",
       "targets" : [
-        "06b391101d38da29faec3d674fd8318f783c482c118d48a14721ffd502f57ba4",
-        "ee7614f47c0f684ce857b9c185517dd3737e51e977a99187f2437165efc5ad84",
+        "7bb5aa5dc3cee1fbb2a05e2d67259eb70a1346510ae411b78fe5159b02350b05",
+        "97b9d311ccf6333f766d20c4a15db0b8ceff88f3732c62f0490562d7117d455d",
         "2662d5c1ba94b401e1811a02c62a74fb6d8c7426f717cc3e3dcc5cfbb8ca8f3d"
       ]
     },
-    "signature" : "b0de30b4b21d9531d9654180e5412783077f1866c998753dcda0588118df0847",
+    "signature" : "1b9e1781d1311e472855849db90f103ad7d5c9cf5160abce8a76d671ede632b5",
     "type" : "project"
   },
   {
@@ -586,6 +602,15 @@
 
               ],
               "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:mac::MAINGROUP::REF_2::REF_10",
+              "guid" : "PACKAGE-PRODUCT:mac_V25ModBuilder.V25ModBuilder::BUILDPHASE_0::10",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
             }
           ],
           "guid" : "PACKAGE-PRODUCT:mac_V25ModBuilder.V25ModBuilder::BUILDPHASE_0",
@@ -611,7 +636,7 @@
       "productTypeIdentifier" : "com.apple.product-type.tool",
       "type" : "standard"
     },
-    "signature" : "06b391101d38da29faec3d674fd8318f783c482c118d48a14721ffd502f57ba4",
+    "signature" : "7bb5aa5dc3cee1fbb2a05e2d67259eb70a1346510ae411b78fe5159b02350b05",
     "type" : "target"
   },
   {
@@ -836,6 +861,15 @@
 
               ],
               "removeHeadersOnCopy" : "false"
+            },
+            {
+              "codeSignOnCopy" : "false",
+              "fileReference" : "PACKAGE:mac::MAINGROUP::REF_3::REF_10",
+              "guid" : "PACKAGE-TARGET:V25ModBuilder--6A05BC648BE51F4F-testable::BUILDPHASE_0::10",
+              "platformFilters" : [
+
+              ],
+              "removeHeadersOnCopy" : "false"
             }
           ],
           "guid" : "PACKAGE-TARGET:V25ModBuilder--6A05BC648BE51F4F-testable::BUILDPHASE_0",
@@ -861,7 +895,7 @@
       "productTypeIdentifier" : "org.swift.product-type.common.object",
       "type" : "standard"
     },
-    "signature" : "ee7614f47c0f684ce857b9c185517dd3737e51e977a99187f2437165efc5ad84",
+    "signature" : "97b9d311ccf6333f766d20c4a15db0b8ceff88f3732c62f0490562d7117d455d",
     "type" : "target"
   },
   {

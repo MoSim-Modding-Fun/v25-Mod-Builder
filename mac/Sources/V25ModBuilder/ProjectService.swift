@@ -15,7 +15,15 @@ enum ProjectService {
         "Built In Data", "EditorSceneList", "Default Local Group", "LynkMod", "MechTechMod",
     ]
 
-    static func resolveProject(at path: String) -> ProjectInfo {
+    /// Must match AddressablesModExporter.cs's RobotsRoot constant exactly.
+    static let robotsRootRelativePath = "Assets/Prefabs/Reefscape/Robots/Mods"
+
+    /// Mirrors main.js's async resolveProject(): reads the project, then (best-effort,
+    /// before listing groups) runs Unity headless to auto-register any new moddable
+    /// folder as a proper Addressable group - async because launching Unity can take
+    /// real wall-clock time and this app has no separate main/renderer process to hide
+    /// that behind, unlike Electron.
+    static func resolveProject(at path: String, unityPathOverride: String?) async -> ProjectInfo {
         let fm = FileManager.default
         let assetsDir = (path as NSString).appendingPathComponent("Assets")
         let versionFile = (path as NSString).appendingPathComponent("ProjectSettings/ProjectVersion.txt")
@@ -32,8 +40,57 @@ enum ProjectService {
         }
 
         let unityVersion = extractEditorVersion(versionText)
+        let detectedUnityPath = unityVersion.flatMap { UnityLocator.detect(version: $0) }
+        await autoRegisterNewModFolders(projectPath: path, unityPath: unityPathOverride ?? detectedUnityPath)
+
         let groups = listAddressableGroups(projectPath: path)
         return ProjectInfo(projectPath: path, unityVersion: unityVersion, groups: groups, error: nil)
+    }
+
+    /// Runs Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine, which
+    /// scans RobotsRoot for folders with a robot that can actually load and spawn
+    /// (RobotPrefab + MainMenuPrefab both set) and turns any new ones into a proper
+    /// Addressable mod group + modpack metadata asset. Best-effort: any failure here
+    /// just means new folders won't show up as groups yet, not a fatal project-load error.
+    private static func autoRegisterNewModFolders(projectPath: String, unityPath: String?) async {
+        guard let unityPath, FileManager.default.isExecutableFile(atPath: unityPath) else { return }
+        let candidates = findCandidateModFolders(projectPath: projectPath, knownGroupNames: listAddressableGroups(projectPath: projectPath))
+        guard !candidates.isEmpty else { return }
+
+        let args = [
+            "-batchmode", "-quit", "-nographics",
+            "-projectPath", projectPath,
+            "-executeMethod", "Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine",
+        ]
+        _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int32, Never>) in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: unityPath)
+            process.arguments = args
+            process.terminationHandler = { proc in continuation.resume(returning: proc.terminationStatus) }
+            do { try process.run() } catch { continuation.resume(returning: -1) }
+        }
+    }
+
+    /// Cheap filesystem-only pre-check so a normal project select stays instant; Unity
+    /// only gets launched (slow) when there's actually a subfolder not already used by
+    /// some group's entry. Name-matching here is just an optimization, not the
+    /// correctness check - AutoRegisterModGroups on the Unity side re-checks by folder
+    /// GUID against every group's real entries, so a stale/mismatched group name can at
+    /// worst trigger an unnecessary (harmless) Unity launch, never a duplicate group.
+    private static func findCandidateModFolders(projectPath: String, knownGroupNames: [String]) -> [String] {
+        let robotsRoot = (projectPath as NSString).appendingPathComponent(robotsRootRelativePath)
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: robotsRoot, isDirectory: &isDir), isDir.boolValue else { return [] }
+        guard let entries = try? fm.contentsOfDirectory(atPath: robotsRoot) else { return [] }
+
+        let known = Set(knownGroupNames)
+        return entries.filter { name in
+            guard !known.contains(name) else { return false }
+            var entryIsDir: ObjCBool = false
+            let full = (robotsRoot as NSString).appendingPathComponent(name)
+            return fm.fileExists(atPath: full, isDirectory: &entryIsDir) && entryIsDir.boolValue
+        }
     }
 
     private static func extractEditorVersion(_ text: String) -> String? {

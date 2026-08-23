@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Page 2 of the wizard - mirrors #page-groups: Groups checklist (with per-group
-/// Version/Zip name fields), Platforms checkboxes, Output Folder, and a live Preview
-/// of the resulting zip filenames.
+/// Version/Zip name fields), Platforms checkboxes, and Output Folder. The zip-name
+/// preview and GitHub release opt-in live on the following Output page.
 struct GroupsPage: View {
     @EnvironmentObject var appState: AppState
 
@@ -23,15 +23,11 @@ struct GroupsPage: View {
                                 HStack(spacing: 8) {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Version (optional)").font(.system(size: 10)).foregroundColor(Theme.dim)
-                                        TextField("none", text: $group.version)
-                                            .textFieldStyle(.roundedBorder)
-                                            .font(.system(size: 11))
+                                        RufusEditableField(text: $group.version, placeholder: "none")
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Zip name override (optional)").font(.system(size: 10)).foregroundColor(Theme.dim)
-                                        TextField(group.name, text: $group.zipName)
-                                            .textFieldStyle(.roundedBorder)
-                                            .font(.system(size: 11))
+                                        RufusEditableField(text: $group.zipName, placeholder: group.name)
                                     }
                                 }
                                 .padding(.leading, 20)
@@ -73,41 +69,6 @@ struct GroupsPage: View {
                 }
             }
 
-            RufusGroupBox(title: "Preview") {
-                previewList
-            }
         }
-    }
-
-    /// Mirrors renderZipPreview() in renderer.js and ZipAndCleanup's archive-name
-    /// logic in AddressablesModExporter.cs exactly.
-    private var previewList: some View {
-        let selectedGroups = appState.groups.filter { $0.checked }
-        let platforms = PlatformTarget.allCases.filter { appState.selectedPlatforms.contains($0) }
-
-        return Group {
-            if selectedGroups.isEmpty || platforms.isEmpty {
-                Text("Select a group and a platform to preview output filenames.")
-                    .font(.system(size: 11))
-                    .foregroundColor(Theme.dim)
-            } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(selectedGroups) { group in
-                        ForEach(platforms) { platform in
-                            Text(fileName(for: group, platform: platform))
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(Theme.dim)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func fileName(for group: ModGroup, platform: PlatformTarget) -> String {
-        let zipName = group.zipName.trimmingCharacters(in: .whitespaces).isEmpty ? group.name : group.zipName
-        let version = group.version.trimmingCharacters(in: .whitespaces)
-        let label = platform.zipLabel
-        return version.isEmpty ? "\(zipName) \(label).zip" : "\(zipName) \(version) \(label).zip"
     }
 }

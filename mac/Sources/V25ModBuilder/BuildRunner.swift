@@ -15,6 +15,12 @@ final class BuildRunner: ObservableObject {
     /// console tab as each platform finishes and the next one starts.
     @Published var currentPlatform: PlatformTarget?
 
+    /// All successful platforms' output zip paths, in build order - the GitHub release
+    /// step's asset list.
+    @Published var allOutputPaths: [String] = []
+    @Published var releaseStatus: SegmentStatus = .pending
+    @Published var releaseConsoleLines: [ConsoleLine] = []
+
     private let failureMarkers = [
         "error CS",
         "Aborting batchmode due to failure",
@@ -42,6 +48,9 @@ final class BuildRunner: ObservableObject {
             consoleLines[p] = []
             platformStatus[p] = .pending
         }
+        allOutputPaths = []
+        releaseStatus = .pending
+        releaseConsoleLines = []
 
         let logDir = (projectPath as NSString).appendingPathComponent("Tools/build-logs")
         try? FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
@@ -124,6 +133,72 @@ final class BuildRunner: ObservableObject {
                 for p in finalPaths {
                     appendLine(platform: platform, text: p, kind: .success)
                 }
+                allOutputPaths.append(contentsOf: finalPaths)
+            }
+        }
+    }
+
+    var allRequestedPlatformsSucceeded: Bool {
+        !platformStatus.isEmpty && platformStatus.values.allSatisfy { $0 == .success }
+    }
+
+    /// Mirrors main.js's `create-github-release` IPC handler: always releases to the
+    /// Unity project's own repo (not this tool's), via the user's local `gh` CLI.
+    func createGitHubRelease(tag: String, title: String, notes: String) async {
+        releaseStatus = .running
+        appendReleaseLine("Creating GitHub release on \(Self.githubReleaseRepo)...")
+
+        let trimmedTag = tag.trimmingCharacters(in: .whitespaces)
+        guard !trimmedTag.isEmpty else {
+            releaseStatus = .failed
+            appendReleaseLine("No release tag given.", kind: .failure)
+            return
+        }
+        guard !allOutputPaths.isEmpty else {
+            releaseStatus = .failed
+            appendReleaseLine("No build output to attach.", kind: .failure)
+            return
+        }
+
+        var args = ["release", "create", trimmedTag] + allOutputPaths + ["--repo", Self.githubReleaseRepo]
+        let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
+        args += ["--title", trimmedTitle.isEmpty ? trimmedTag : trimmedTitle]
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespaces)
+        args += ["--notes", trimmedNotes.isEmpty ? "Built by v25 Mod Builder." : trimmedNotes]
+
+        let (code, output) = await Self.runGh(arguments: args)
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            appendReleaseLine(String(line), kind: code == 0 ? .success : .failure)
+        }
+        releaseStatus = code == 0 ? .success : .failed
+        appendReleaseLine(code == 0 ? "=== RELEASE : SUCCESS ===" : "=== RELEASE : FAILED ===", kind: code == 0 ? .success : .failure)
+    }
+
+    static let githubReleaseRepo = "MoSim-Modding-Fun/MoSim-Reefscape-Public"
+
+    private func appendReleaseLine(_ text: String, kind: ConsoleLine.Kind = .normal) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        releaseConsoleLines.append(ConsoleLine(time: formatter.string(from: Date()), text: text, kind: kind))
+    }
+
+    private static func runGh(arguments: [String]) async -> (Int32, String) {
+        await withCheckedContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["gh"] + arguments
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+            process.terminationHandler = { proc in
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                continuation.resume(returning: (proc.terminationStatus, output))
+            }
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(returning: (-1, error.localizedDescription))
             }
         }
     }

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   listGroups: (projectPath) => ipcRenderer.invoke('list-groups', projectPath),
   resizeWindowHeight: (height) => ipcRenderer.invoke('resize-window-height', height),
   runBuild: (config) => ipcRenderer.invoke('run-build', config),
+  createGitHubRelease: (config) => ipcRenderer.invoke('create-github-release', config),
   onBuildProgress: (callback) => {
     ipcRenderer.on('build-progress', (_event, data) => callback(data));
   },

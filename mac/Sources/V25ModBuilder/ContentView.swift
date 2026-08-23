@@ -1,13 +1,14 @@
 import SwiftUI
 import AppKit
 
-/// The wizard shell - mirrors renderer.js's showPage()/updateNav() logic: 3 pages,
-/// step dots, and a bottom bar whose BACK/NEXT/START/CLOSE buttons swap per page.
+/// The wizard shell - mirrors renderer.js's showPage()/updateNav() logic: 4 pages
+/// (Project, Groups, Output, Build), step dots, and a bottom bar whose
+/// BACK/NEXT/START/CLOSE buttons swap per page.
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var runner = BuildRunner()
     @State private var page = 0
-    @State private var activeConsoleTab: PlatformTarget = .win64
+    @State private var activeConsoleTab: ConsoleTabID = .platform(.win64)
 
     var body: some View {
         VStack(spacing: 6) {
@@ -17,6 +18,7 @@ struct ContentView: View {
                 switch page {
                 case 0: ProjectPage()
                 case 1: GroupsPage()
+                case 2: OutputPage()
                 default: BuildPage(runner: runner, activeTab: $activeConsoleTab)
                 }
             }
@@ -29,14 +31,15 @@ struct ContentView: View {
         .background(Theme.background)
         .frame(minWidth: 420, minHeight: 260)
         .onAppear {
-            appState.restoreLastProject()
             resizeForCurrentPage()
+            Task { await appState.restoreLastProject() }
         }
         .onChange(of: page) { _ in resizeForCurrentPage() }
-        .onChange(of: appState.groups) { _ in if page == 1 { resizeForCurrentPage() } }
+        .onChange(of: appState.groups) { _ in if page == 1 || page == 2 { resizeForCurrentPage() } }
         .onChange(of: appState.selectedPlatforms) { _ in if page != 0 { resizeForCurrentPage() } }
+        .onChange(of: appState.releaseEnabled) { _ in if page == 2 { resizeForCurrentPage() } }
         .onChange(of: runner.currentPlatform) { newValue in
-            if let newValue { activeConsoleTab = newValue }
+            if let newValue { activeConsoleTab = .platform(newValue) }
         }
     }
 
@@ -56,6 +59,13 @@ struct ContentView: View {
             let perGroup: CGFloat = 24
             let perExpandedExtra: CGFloat = 66
             height = baseline + appState.groups.reduce(0) { $0 + perGroup + ($1.checked ? perExpandedExtra : 0) }
+        case 2:
+            let baseline: CGFloat = 210
+            let perOutputLine: CGFloat = 14
+            let selectedGroups = appState.groups.filter { $0.checked }.count
+            let selectedPlatforms = appState.selectedPlatforms.count
+            let releaseExtra: CGFloat = appState.releaseEnabled ? 130 : 0
+            height = baseline + CGFloat(selectedGroups * selectedPlatforms) * perOutputLine + releaseExtra
         default:
             height = 442
         }
@@ -64,7 +74,7 @@ struct ContentView: View {
 
     private var stepDots: some View {
         HStack(spacing: 6) {
-            ForEach(0..<3, id: \.self) { i in
+            ForEach(0..<4, id: \.self) { i in
                 Circle()
                     .fill(i == page ? Theme.accentBlue : Theme.dotInactive)
                     .overlay(Circle().stroke(i == page ? Theme.linkBlue : Theme.dotInactiveBorder, lineWidth: 1))
@@ -89,9 +99,13 @@ struct ContentView: View {
                     .buttonStyle(StartButtonStyle(enabled: ready))
                     .disabled(!ready)
             } else if page == 1 {
-                Button("START") { startBuild() }
+                Button("NEXT") { page = 2 }
                     .buttonStyle(StartButtonStyle(enabled: appState.canBuild))
                     .disabled(!appState.canBuild)
+            } else if page == 2 {
+                Button("START") { startBuild() }
+                    .buttonStyle(StartButtonStyle(enabled: appState.canStartBuild))
+                    .disabled(!appState.canStartBuild)
             }
 
             Button("CLOSE") { NSApplication.shared.terminate(nil) }
@@ -120,8 +134,8 @@ struct ContentView: View {
     private func startBuild() {
         guard let projectPath = appState.projectPath, let unityPath = appState.unityPath else { return }
         let platforms = PlatformTarget.allCases.filter { appState.selectedPlatforms.contains($0) }
-        activeConsoleTab = platforms.first ?? .win64
-        page = 2
+        activeConsoleTab = .platform(platforms.first ?? .win64)
+        page = 3
         Task {
             await runner.run(
                 projectPath: projectPath,
@@ -130,6 +144,18 @@ struct ContentView: View {
                 platforms: platforms,
                 outputDir: appState.outputDir
             )
+            if appState.releaseEnabled {
+                if runner.allRequestedPlatformsSucceeded {
+                    activeConsoleTab = .release
+                    await runner.createGitHubRelease(
+                        tag: appState.releaseTag,
+                        title: appState.releaseTitle,
+                        notes: appState.releaseNotes
+                    )
+                } else {
+                    runner.releaseStatus = .failed
+                }
+            }
         }
     }
 }

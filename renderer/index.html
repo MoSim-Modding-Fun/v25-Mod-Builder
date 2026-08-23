@@ -11,6 +11,7 @@
     <span class="dot" data-step="0"></span>
     <span class="dot" data-step="1"></span>
     <span class="dot" data-step="2"></span>
+    <span class="dot" data-step="3"></span>
   </div>
 
   <main id="pages">
@@ -58,9 +59,29 @@
         </div>
       </fieldset>
 
+    </section>
+
+    <section class="page" id="page-output">
       <fieldset class="group">
-        <legend>Preview</legend>
+        <legend>Output</legend>
         <div id="zip-preview" class="list status-box">Select a group and a platform to preview output filenames.</div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>GitHub Release</legend>
+        <label class="checkbox-row"><input type="checkbox" id="release-enabled-check" /> Create a GitHub release after a successful build</label>
+        <div id="release-fields" class="release-fields" style="display:none">
+          <div class="row">
+            <input type="text" id="release-tag-field" class="field" placeholder="Tag (e.g. v1.0.0)" />
+          </div>
+          <div class="row">
+            <input type="text" id="release-title-field" class="field" placeholder="Title (optional, defaults to the tag)" />
+          </div>
+          <div class="row">
+            <input type="text" id="release-notes-field" class="field" placeholder="Notes (optional)" />
+          </div>
+          <div id="release-repo-info" class="info"></div>
+        </div>
       </fieldset>
     </section>
 
