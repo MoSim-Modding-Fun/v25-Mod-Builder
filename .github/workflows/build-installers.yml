@@ -71,8 +71,9 @@ jobs:
         run: |
           APP="V25 Mod Builder.app"
           rm -rf "$APP"
-          mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp .build/release/V25ModBuilder "$APP/Contents/MacOS/V25 Mod Builder"
+          cp ../build/icon.icns "$APP/Contents/Resources/AppIcon.icns"
           cat > "$APP/Contents/Info.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -82,6 +83,7 @@ jobs:
             <key>CFBundleIdentifier</key><string>com.v25.modbuilder</string>
             <key>CFBundleName</key><string>V25 Mod Builder</string>
             <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>AppIcon</string>
             <key>CFBundleShortVersionString</key><string>${VERSION#v}</string>
             <key>CFBundleVersion</key><string>1</string>
             <key>LSMinimumSystemVersion</key><string>13.0</string>
@@ -91,13 +93,15 @@ jobs:
           </plist>
           PLIST
           codesign --force --deep --sign - "$APP"
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "V25ModBuilder-macOS.zip"
+          # Matches package.json's electron-builder artifactName style ("Mod Builder
+          # Installer <Platform>.<ext>") so all three platforms read as one product.
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "Mod Builder Installer Mac.zip"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: installer-macos
-          path: mac/V25ModBuilder-macOS.zip
+          path: "mac/Mod Builder Installer Mac.zip"
           if-no-files-found: error
 
   # Only runs when the push is a version tag (v1.0.0 etc) - creates a GitHub
