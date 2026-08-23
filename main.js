@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
+const { ensureExporterScriptInstalled } = require('./unity-script-installer');
+const { parseUnityProcesses, commandLineTargetsProject, isUnityEditorCommand } = require('./unity-process');
 
 let mainWindow;
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
@@ -100,9 +102,13 @@ function detectUnity(version) {
 // repo as example/template mods rather than something meant to be built and distributed.
 const RESERVED_GROUP_NAMES = new Set([
   'Built In Data', 'EditorSceneList', 'Default Local Group', 'LynkMod', 'MechTechMod',
+  // The example mod that ships in the public template project - auto-registration would
+  // otherwise surface it as a buildable group for every single user.
+  'LynkModOfficial',
 ]);
 
-function listAddressableGroups(projectPath) {
+// Every group actually defined in the project, reserved ones included.
+function listAllAddressableGroupNames(projectPath) {
   const groupsDir = path.join(projectPath, 'Assets', 'AddressableAssetsData', 'AssetGroups');
   if (!fs.existsSync(groupsDir)) return [];
 
@@ -112,11 +118,14 @@ function listAddressableGroups(projectPath) {
     const content = fs.readFileSync(path.join(groupsDir, entry.name), 'utf8');
     const match = content.match(/m_GroupName:\s*(.+)/);
     if (!match) continue;
-    const name = match[1].trim();
-    if (RESERVED_GROUP_NAMES.has(name)) continue;
-    names.push(name);
+    names.push(match[1].trim());
   }
   return names.sort();
+}
+
+// The buildable groups shown in the UI.
+function listAddressableGroups(projectPath) {
+  return listAllAddressableGroupNames(projectPath).filter((name) => !RESERVED_GROUP_NAMES.has(name));
 }
 
 // ---------- IPC: settings & project selection ----------
@@ -127,18 +136,53 @@ ipcMain.handle('load-settings', () => loadSettings());
 // AddressablesModExporter.cs's RobotsRoot constant exactly.
 const ROBOTS_ROOT_REL = ['Assets', 'Prefabs', 'Reefscape', 'Robots', 'Mods'];
 
+// Every asset GUID already claimed by some group's entry list. Entries are the
+// "- m_GUID:" list items under m_SerializeEntries; the group's own bare "m_GUID:" line
+// has no leading dash, so this deliberately doesn't pick it up.
+function listRegisteredEntryGuids(projectPath) {
+  const groupsDir = path.join(projectPath, 'Assets', 'AddressableAssetsData', 'AssetGroups');
+  if (!fs.existsSync(groupsDir)) return new Set();
+
+  const guids = new Set();
+  for (const entry of fs.readdirSync(groupsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.asset')) continue;
+    const content = fs.readFileSync(path.join(groupsDir, entry.name), 'utf8');
+    for (const match of content.matchAll(/-\s*m_GUID:\s*([0-9a-f]+)/g)) guids.add(match[1]);
+  }
+  return guids;
+}
+
+// Unity stores an asset's GUID in its sibling .meta file.
+function readAssetGuid(assetPath) {
+  try {
+    const meta = fs.readFileSync(`${assetPath}.meta`, 'utf8');
+    const match = meta.match(/^guid:\s*([0-9a-f]+)/m);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 // Cheap filesystem-only pre-check so a normal project select stays instant; Unity only
-// gets launched (slow) when there's actually a subfolder not already used by some
-// group's entry. Name-matching here is just an optimization, not the correctness
-// check - AutoRegisterModGroups on the Unity side re-checks by folder GUID against
-// every group's real entries, so a stale/mismatched group name can at worst trigger an
-// unnecessary (harmless) Unity launch, never a duplicate group.
-function findCandidateModFolders(projectPath, knownGroupNames) {
+// gets launched (slow) when there's actually a mod folder no group has claimed yet.
+//
+// Matches on GUID rather than on folder-vs-group name, exactly like AutoRegisterModGroups
+// does on the Unity side. Name matching gets this wrong in both directions and each
+// mistake costs a full, pointless Unity launch on every project load: a group whose name
+// drifted from its folder (folder "Lanternfly" registered as group "Lanternfly Mod")
+// looks unregistered forever, and so does any reserved group excluded from the UI list.
+function findCandidateModFolders(projectPath) {
   const robotsRoot = path.join(projectPath, ...ROBOTS_ROOT_REL);
   if (!fs.existsSync(robotsRoot)) return [];
-  const known = new Set(knownGroupNames);
+
+  const registered = listRegisteredEntryGuids(projectPath);
   return fs.readdirSync(robotsRoot, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !known.has(e.name))
+    .filter((e) => e.isDirectory())
+    .filter((e) => {
+      const guid = readAssetGuid(path.join(robotsRoot, e.name));
+      // No .meta yet means Unity hasn't imported it - let the scan handle it.
+      return !guid || !registered.has(guid);
+    })
     .map((e) => e.name);
 }
 
@@ -149,8 +193,14 @@ function findCandidateModFolders(projectPath, knownGroupNames) {
 // means new folders won't show up as groups yet, not a fatal project-load error.
 async function autoRegisterNewModFolders(projectPath, unityPath) {
   if (!unityPath || !fs.existsSync(unityPath)) return;
-  const candidates = findCandidateModFolders(projectPath, listAddressableGroups(projectPath));
+  const candidates = findCandidateModFolders(projectPath);
   if (candidates.length === 0) return;
+
+  const install = ensureExporterScriptInstalled(projectPath);
+  if (install.status === 'failed') {
+    console.error(`auto-register skipped: ${install.error}`);
+    return;
+  }
 
   await runUnityBuild(projectPath, unityPath, [
     '-batchmode', '-quit', '-nographics',
@@ -190,7 +240,7 @@ function resolveProjectFast(projectPath) {
 
   const detectedUnityPath = unityVersion ? detectUnity(unityVersion) : null;
   const groups = listAddressableGroups(projectPath);
-  const needsScan = findCandidateModFolders(projectPath, groups).length > 0;
+  const needsScan = findCandidateModFolders(projectPath).length > 0;
 
   return { projectPath, unityVersion, groups, detectedUnityPath, scanning: needsScan };
 }
@@ -199,13 +249,29 @@ function resolveProjectFast(projectPath) {
 // auto-register pass, then pushes any newly-discovered groups to the renderer. Ignored
 // if the user has since loaded a different project.
 async function scanForNewGroupsInBackground(projectPath, unityPath) {
-  await autoRegisterNewModFolders(projectPath, unityPath);
-  if (projectPath !== currentProjectPath || !mainWindow) return;
-  mainWindow.webContents.send('project-scan-complete', {
-    projectPath,
-    groups: listAddressableGroups(projectPath),
-  });
+  try {
+    await autoRegisterNewModFolders(projectPath, unityPath);
+  } catch (err) {
+    // Best-effort: a failed scan just means new folders aren't registered yet.
+    console.error(`auto-register scan failed: ${err.message}`);
+  } finally {
+    // Always report completion, even on failure - the renderer gates the BUILD button on
+    // "not currently scanning", so a swallowed error here would disable it permanently.
+    if (projectPath === currentProjectPath && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('project-scan-complete', {
+        projectPath,
+        groups: listAddressableGroups(projectPath),
+      });
+    }
+  }
 }
+
+// Remembers, per project (for this app session only - not persisted), the exact set of
+// candidate mod folders the last scan already tried. A folder whose robot is missing
+// RobotPrefab/MainMenuPrefab never turns into a group no matter how many times Unity
+// re-scans it, so without this a project with one such folder would re-run the full
+// (slow - genuine Unity domain-reload wall-clock time) scan on every single load.
+const scannedCandidatesByProject = new Map();
 
 function loadProject(rawProjectPath) {
   const fast = resolveProjectFast(rawProjectPath);
@@ -221,7 +287,13 @@ function loadProject(rawProjectPath) {
   saveSettings(settings);
 
   if (fast.scanning) {
-    scanForNewGroupsInBackground(projectPath, settings.unityPathOverride || fast.detectedUnityPath);
+    const candidateSignature = findCandidateModFolders(projectPath).sort().join('|');
+    if (scannedCandidatesByProject.get(projectPath) === candidateSignature) {
+      fast.scanning = false; // already tried scanning this exact set of folders this session
+    } else {
+      scannedCandidatesByProject.set(projectPath, candidateSignature);
+      scanForNewGroupsInBackground(projectPath, settings.unityPathOverride || fast.detectedUnityPath);
+    }
   }
 
   return fast;
@@ -348,12 +420,144 @@ function moveFile(src, dest) {
   }
 }
 
+// PIDs of Unity processes THIS app started. The "is the project already open?" check
+// below looks for Unity processes holding the project, and must never offer to kill our
+// own headless build - only a real Editor the user has open.
+const ownUnityPids = new Set();
+
 function runUnityBuildProcess(unityPath, args) {
   return new Promise((resolve) => {
     const proc = spawn(unityPath, args, { windowsHide: false });
-    proc.on('error', (err) => resolve({ code: -1, error: err.message }));
-    proc.on('exit', (code) => resolve({ code }));
+    if (proc.pid) ownUnityPids.add(proc.pid);
+    const done = (result) => {
+      if (proc.pid) ownUnityPids.delete(proc.pid);
+      resolve(result);
+    };
+    proc.on('error', (err) => done({ code: -1, error: err.message }));
+    proc.on('exit', (code) => done({ code }));
   });
+}
+
+// ---------- "project is already open in Unity" handling ----------
+
+function execToString(command, args) {
+  return new Promise((resolve) => {
+    const proc = spawn(command, args, { windowsHide: true });
+    let out = '';
+    proc.stdout.on('data', (d) => { out += d; });
+    proc.on('error', () => resolve(''));
+    proc.on('close', () => resolve(out));
+  });
+}
+
+// Unity Editors opened through Unity Hub (every platform) carry the project directory in
+// their command line, which is what lets us tell "this project is open" apart from "some
+// unrelated Unity is running". Falls back to no-match rather than guessing.
+async function findForeignUnityProcesses(projectPath) {
+  const normalized = path.resolve(projectPath).replace(/[\\/]+$/, '');
+  const matches = [];
+
+  if (process.platform === 'win32') {
+    const json = await execToString('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'Unity*' } | " +
+      'Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress',
+    ]);
+    let entries = [];
+    try {
+      const parsed = JSON.parse(json || '[]');
+      entries = Array.isArray(parsed) ? parsed : [parsed];
+    } catch { entries = []; }
+    for (const entry of entries) {
+      if (!entry || !entry.CommandLine || !entry.ProcessId) continue;
+      if (ownUnityPids.has(entry.ProcessId)) continue;
+      // 'Unity*' also matches UnityPackageManager.exe / Unity.Licensing.Client.exe, so
+      // re-check argv[0] the same way the POSIX branch does.
+      if (!isUnityEditorCommand(entry.CommandLine)) continue;
+      if (!commandLineTargetsProject(entry.CommandLine, normalized)) continue;
+      matches.push({ pid: entry.ProcessId, cmd: entry.CommandLine });
+    }
+    return matches;
+  }
+
+  const ps = await execToString('ps', ['-eo', 'pid=,args=']);
+  return parseUnityProcesses(ps, normalized, ownUnityPids);
+}
+
+function lockFileExists(projectPath) {
+  return fs.existsSync(path.join(projectPath, 'Temp', 'UnityLockfile'));
+}
+
+function killProcess(pid, force) {
+  if (process.platform === 'win32') {
+    const args = ['/PID', String(pid), '/T'];
+    if (force) args.push('/F');
+    return execToString('taskkill.exe', args);
+  }
+  try {
+    process.kill(pid, force ? 'SIGKILL' : 'SIGTERM');
+  } catch { /* already gone */ }
+  return Promise.resolve('');
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function processStillAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Returns { ok: true } to proceed, or { ok: false, reason } to abort.
+async function ensureProjectNotOpenInUnity(projectPath) {
+  if (!lockFileExists(projectPath)) return { ok: true };
+
+  const foreign = await findForeignUnityProcesses(projectPath);
+  // A stale lockfile with no live Editor behind it is harmless - Unity clears it itself.
+  if (foreign.length === 0) return { ok: true };
+
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Close Unity and continue', 'Cancel build'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Project is open in Unity',
+    message: 'This project is currently open in the Unity Editor.',
+    detail:
+      'Unity can\'t open the same project twice, so the build can\'t run while the Editor ' +
+      'has it open.\n\nClosing Unity from here will not save your work first - save anything ' +
+      'you need in Unity before continuing.',
+  });
+
+  if (response !== 0) {
+    return { ok: false, reason: 'Project is open in the Unity Editor and the build was cancelled.' };
+  }
+
+  for (const proc of foreign) await killProcess(proc.pid, false);
+
+  // Give the Editor a chance to shut down cleanly (and release the lock) before forcing it.
+  for (let waited = 0; waited < 20000; waited += 500) {
+    await sleep(500);
+    if (!foreign.some((p) => processStillAlive(p.pid))) break;
+  }
+  for (const proc of foreign) {
+    if (processStillAlive(proc.pid)) await killProcess(proc.pid, true);
+  }
+
+  // Unity removes Temp/UnityLockfile on exit; if it was killed hard, clear the leftover
+  // ourselves so the next launch doesn't trip over it.
+  for (let waited = 0; waited < 10000; waited += 500) {
+    if (!lockFileExists(projectPath)) break;
+    await sleep(500);
+  }
+  if (lockFileExists(projectPath) && !(await findForeignUnityProcesses(projectPath)).length) {
+    try { fs.unlinkSync(path.join(projectPath, 'Temp', 'UnityLockfile')); } catch { /* fine */ }
+  }
+
+  return { ok: true };
 }
 
 // Unity refuses to open a project that's already locked by another instance of itself
@@ -364,8 +568,15 @@ function runUnityBuildProcess(unityPath, args) {
 // This serializes every Unity launch per projectPath so that never happens.
 const projectUnityLocks = new Map(); // projectPath -> tail promise of the queue
 function runUnityBuild(projectPath, unityPath, args) {
+  // The already-open check runs INSIDE the queue slot, not before it: checking earlier
+  // would race a queued sibling launch that hasn't taken the lock yet.
+  const launch = async () => {
+    const clear = await ensureProjectNotOpenInUnity(projectPath);
+    if (!clear.ok) return { code: -1, error: clear.reason };
+    return runUnityBuildProcess(unityPath, args);
+  };
   const previous = projectUnityLocks.get(projectPath) || Promise.resolve();
-  const run = previous.then(() => runUnityBuildProcess(unityPath, args), () => runUnityBuildProcess(unityPath, args));
+  const run = previous.then(launch, launch);
   projectUnityLocks.set(projectPath, run.catch(() => {}));
   return run;
 }
@@ -408,6 +619,14 @@ ipcMain.handle('run-build', async (event, config) => {
     const reason = `Unity executable not found at: ${unityPath}`;
     appendHistoryLog(logDir, `FAILURE  target=(none)  groups=${summarizeGroups(groups)}  reason="${reason}"`);
     return [{ target: null, status: 'failed', error: reason }];
+  }
+
+  // The build runs entirely through the bundled Editor script's -executeMethod entry
+  // point, so a missing/outdated copy is a hard failure here rather than best-effort.
+  const install = ensureExporterScriptInstalled(projectPath);
+  if (install.status === 'failed') {
+    appendHistoryLog(logDir, `FAILURE  target=(none)  groups=${summarizeGroups(groups)}  reason="${install.error}"`);
+    return [{ target: null, status: 'failed', error: install.error }];
   }
 
   const groupsSummary = summarizeGroups(groups);

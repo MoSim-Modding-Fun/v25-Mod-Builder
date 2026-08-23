@@ -55,6 +55,16 @@ final class BuildRunner: ObservableObject {
         releaseStatus = .pending
         releaseConsoleLines = []
 
+        // The build runs entirely through the bundled Editor script's -executeMethod entry
+        // points, and the public template project doesn't ship that script - so make sure
+        // it's there before spending any time launching Unity. Same shape as main.js's
+        // run-build handler's "Unity executable not found" early-out: mark the first
+        // platform failed with a reason and stop, no Unity process gets spawned.
+        if case .failed(let installError) = UnityScriptInstaller.ensureInstalled(projectPath: projectPath) {
+            failEarly(platforms: platforms, reason: "couldn't install exporter script: \(installError)")
+            return
+        }
+
         let logDir = (projectPath as NSString).appendingPathComponent("Tools/build-logs")
         try? FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
 
@@ -90,8 +100,17 @@ final class BuildRunner: ObservableObject {
             }
             tailer.start()
 
-            await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) {
-                _ = await Self.runProcess(executable: unityPath, arguments: args)
+            // The already-open-in-Unity check runs INSIDE the queue slot (see
+            // UnityLaunchQueue's doc comment) - if the user cancels that prompt, abort
+            // this platform's build the same way a missing Unity executable would.
+            let abortReason: String? = await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) { clear in
+                switch clear {
+                case .ok:
+                    _ = await Self.runProcess(executable: unityPath, arguments: args)
+                    return nil
+                case .aborted(let reason):
+                    return reason
+                }
             }
             tailer.stop()
             tailer.drainOnce() // catch anything written between the last poll and process exit
@@ -101,10 +120,10 @@ final class BuildRunner: ObservableObject {
             let missing = builtPaths.filter { !FileManager.default.fileExists(atPath: $0) }
             let failureMarker = failureMarkers.first { logContent.contains($0) }
 
-            var failed = failureMarker != nil || !missing.isEmpty
-            var reason: String?
-            if let marker = failureMarker { reason = "build log contains \"\(marker)\"" }
-            else if !missing.isEmpty { reason = "missing expected output: \(missing.joined(separator: "; "))" }
+            var failed = abortReason != nil || failureMarker != nil || !missing.isEmpty
+            var reason: String? = abortReason
+            if reason == nil, let marker = failureMarker { reason = "build log contains \"\(marker)\"" }
+            else if reason == nil, !missing.isEmpty { reason = "missing expected output: \(missing.joined(separator: "; "))" }
 
             var finalPaths = builtPaths
             if !failed, let outputDir, !outputDir.isEmpty {
@@ -208,20 +227,41 @@ final class BuildRunner: ObservableObject {
         }
     }
 
+    /// Mirrors main.js's runUnityBuildProcess(): registers the spawned PID with the
+    /// launch queue's ownUnityPids set before the process can be observed by the
+    /// already-open check, and releases it on exit - a headless build Unity itself
+    /// launched here must never be mistaken for a foreign Editor to offer killing.
     private static func runProcess(executable: String, arguments: [String]) async -> Int32 {
         await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: executable)
             process.arguments = arguments
             process.terminationHandler = { proc in
+                let pid = proc.processIdentifier
+                Task { @MainActor in UnityLaunchQueue.shared.releaseOwnPid(pid) }
                 continuation.resume(returning: proc.terminationStatus)
             }
             do {
                 try process.run()
+                UnityLaunchQueue.shared.trackOwnPid(process.processIdentifier)
             } catch {
                 continuation.resume(returning: -1)
             }
         }
+    }
+
+    /// Marks the build failed before any platform actually ran - e.g. a pre-flight check
+    /// like the exporter-script install failed, or the "project already open in Unity"
+    /// prompt got cancelled. Mirrors the shape of the per-platform failure block further
+    /// down (first platform's status/console show the reason) since there's no separate
+    /// top-level error field in this model, same as main.js returning a single
+    /// `{ target: null, status: 'failed', error }` entry from run-build.
+    private func failEarly(platforms: [PlatformTarget], reason: String) {
+        guard let first = platforms.first else { return }
+        currentPlatform = first
+        platformStatus[first] = .failed
+        appendLine(platform: first, text: "=== \(first.rawValue) : FAILED ===", kind: .failure)
+        appendLine(platform: first, text: "Reason: \(reason)", kind: .failure)
     }
 
     private func appendLine(platform: PlatformTarget, text: String, kind: ConsoleLine.Kind = .normal) {

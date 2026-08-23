@@ -16,6 +16,9 @@ struct ProjectInfo {
 enum ProjectService {
     static let reservedGroupNames: Set<String> = [
         "Built In Data", "EditorSceneList", "Default Local Group", "LynkMod", "MechTechMod",
+        // The example mod that ships in the public template project - auto-registration would
+        // otherwise surface it as a buildable group for every single user.
+        "LynkModOfficial",
     ]
 
     /// Must match AddressablesModExporter.cs's RobotsRoot constant exactly.
@@ -48,7 +51,7 @@ enum ProjectService {
 
         let unityVersion = extractEditorVersion(versionText)
         let groups = listAddressableGroups(projectPath: path)
-        let needsScan = !findCandidateModFolders(projectPath: path, knownGroupNames: groups).isEmpty
+        let needsScan = !findCandidateModFolders(projectPath: path).isEmpty
         return ProjectInfo(projectPath: path, unityVersion: unityVersion, groups: groups, error: nil, scanning: needsScan)
     }
 
@@ -66,45 +69,104 @@ enum ProjectService {
     /// just means new folders won't show up as groups yet, not a fatal project-load error.
     private static func autoRegisterNewModFolders(projectPath: String, unityPath: String?) async {
         guard let unityPath, FileManager.default.isExecutableFile(atPath: unityPath) else { return }
-        let candidates = findCandidateModFolders(projectPath: projectPath, knownGroupNames: listAddressableGroups(projectPath: projectPath))
+        let candidates = findCandidateModFolders(projectPath: projectPath)
         guard !candidates.isEmpty else { return }
+
+        // Best-effort, like the rest of this scan: if we can't install the driver script,
+        // just skip the scan silently rather than surfacing a hard error for a background
+        // auto-register pass the user didn't explicitly ask for.
+        if case .failed(let error) = UnityScriptInstaller.ensureInstalled(projectPath: projectPath) {
+            print("auto-register scan: couldn't install exporter script: \(error)")
+            return
+        }
 
         let args = [
             "-batchmode", "-quit", "-nographics",
             "-projectPath", projectPath,
             "-executeMethod", "Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine",
         ]
-        await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) {
+        await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) { clear in
+            // Best-effort: if the project turned out to be open in a foreign Editor and
+            // the user cancelled, just skip this background scan rather than nagging them
+            // twice (a real build later will surface the same prompt if it still applies).
+            guard case .ok = clear else { return }
             _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int32, Never>) in
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: unityPath)
                 process.arguments = args
-                process.terminationHandler = { proc in continuation.resume(returning: proc.terminationStatus) }
-                do { try process.run() } catch { continuation.resume(returning: -1) }
+                process.terminationHandler = { proc in
+                    let pid = proc.processIdentifier
+                    Task { @MainActor in UnityLaunchQueue.shared.releaseOwnPid(pid) }
+                    continuation.resume(returning: proc.terminationStatus)
+                }
+                do {
+                    try process.run()
+                    let pid = process.processIdentifier
+                    Task { @MainActor in UnityLaunchQueue.shared.trackOwnPid(pid) }
+                } catch { continuation.resume(returning: -1) }
             }
         }
     }
 
     /// Cheap filesystem-only pre-check so a normal project select stays instant; Unity
-    /// only gets launched (slow) when there's actually a subfolder not already used by
-    /// some group's entry. Name-matching here is just an optimization, not the
-    /// correctness check - AutoRegisterModGroups on the Unity side re-checks by folder
-    /// GUID against every group's real entries, so a stale/mismatched group name can at
-    /// worst trigger an unnecessary (harmless) Unity launch, never a duplicate group.
-    private static func findCandidateModFolders(projectPath: String, knownGroupNames: [String]) -> [String] {
+    /// only gets launched (slow) when there's actually a mod folder no group has claimed
+    /// yet.
+    ///
+    /// Matches on GUID rather than on folder-vs-group name, exactly like
+    /// AutoRegisterModGroups does on the Unity side. Name matching gets this wrong in both
+    /// directions and each mistake costs a full, pointless Unity launch on every project
+    /// load: a group whose name drifted from its folder (folder "Lanternfly" registered as
+    /// group "Lanternfly Mod") looks unregistered forever, and so does any reserved group
+    /// excluded from the UI list.
+    private static func findCandidateModFolders(projectPath: String) -> [String] {
         let robotsRoot = (projectPath as NSString).appendingPathComponent(robotsRootRelativePath)
         let fm = FileManager.default
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: robotsRoot, isDirectory: &isDir), isDir.boolValue else { return [] }
         guard let entries = try? fm.contentsOfDirectory(atPath: robotsRoot) else { return [] }
 
-        let known = Set(knownGroupNames)
+        let registered = listRegisteredEntryGuids(projectPath: projectPath)
         return entries.filter { name in
-            guard !known.contains(name) else { return false }
             var entryIsDir: ObjCBool = false
             let full = (robotsRoot as NSString).appendingPathComponent(name)
-            return fm.fileExists(atPath: full, isDirectory: &entryIsDir) && entryIsDir.boolValue
+            guard fm.fileExists(atPath: full, isDirectory: &entryIsDir), entryIsDir.boolValue else { return false }
+            // No .meta yet means Unity hasn't imported it - let the scan handle it.
+            guard let guid = readAssetGuid(assetPath: full) else { return true }
+            return !registered.contains(guid)
         }
+    }
+
+    /// Every asset GUID already claimed by some group's entry list. Entries are the
+    /// "- m_GUID:" list items under m_SerializeEntries; the group's own bare "m_GUID:"
+    /// line has no leading dash, so this deliberately doesn't pick it up.
+    private static func listRegisteredEntryGuids(projectPath: String) -> Set<String> {
+        let groupsDir = (projectPath as NSString).appendingPathComponent("Assets/AddressableAssetsData/AssetGroups")
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: groupsDir) else { return [] }
+
+        var guids = Set<String>()
+        for entry in entries where entry.hasSuffix(".asset") {
+            let fullPath = (groupsDir as NSString).appendingPathComponent(entry)
+            guard let content = try? String(contentsOfFile: fullPath, encoding: .utf8) else { continue }
+            for rawLine in content.split(separator: "\n") {
+                let line = rawLine.trimmingCharacters(in: .whitespaces)
+                guard line.hasPrefix("- m_GUID:") else { continue }
+                let value = line.dropFirst("- m_GUID:".count).trimmingCharacters(in: .whitespaces)
+                if !value.isEmpty { guids.insert(value) }
+            }
+        }
+        return guids
+    }
+
+    /// Unity stores an asset's GUID in its sibling .meta file.
+    private static func readAssetGuid(assetPath: String) -> String? {
+        guard let meta = try? String(contentsOfFile: assetPath + ".meta", encoding: .utf8) else { return nil }
+        for rawLine in meta.split(separator: "\n") {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard line.hasPrefix("guid:") else { continue }
+            let value = line.dropFirst("guid:".count).trimmingCharacters(in: .whitespaces)
+            return value.isEmpty ? nil : value
+        }
+        return nil
     }
 
     private static func extractEditorVersion(_ text: String) -> String? {

@@ -24,7 +24,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "renderer/**/*"
+      "renderer/**/*",
+      "unity/**/*"
     ],
     "icon": "build/icon.png",
     "mac": {

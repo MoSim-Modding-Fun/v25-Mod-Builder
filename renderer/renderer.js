@@ -1,4 +1,5 @@
 let projectPath = null;
+let isScanningForNewGroups = false;
 let unityPath = null;
 let detectedUnityPath = null;
 let outputDir = null; // null = default "<project>/Mods"
@@ -89,7 +90,10 @@ function updateNav() {
   } else if (currentPage === 2) {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = '';
-    els.buildBtn.disabled = !(buildReady && releaseReady);
+    els.buildBtn.disabled = !(buildReady && releaseReady) || isScanningForNewGroups;
+    els.buildBtn.title = isScanningForNewGroups
+      ? 'Waiting for the mod-folder scan to finish (see Project page) - starting a build now would just queue behind it.'
+      : '';
   } else {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = 'none';
@@ -150,6 +154,7 @@ function renderUnityInfo() {
 }
 
 function setScanning(isScanning) {
+  isScanningForNewGroups = isScanning;
   els.scanStatus.style.display = isScanning ? 'flex' : 'none';
   syncWindowSize();
 }
@@ -189,10 +194,8 @@ window.api.onProjectScanComplete((data) => {
 
   const currentNames = Object.keys(groupsState);
   const isSame = data.groups.length === currentNames.length && data.groups.every((n) => currentNames.includes(n));
-  if (!isSame) {
-    renderGroups(data.groups);
-    updateNav();
-  }
+  if (!isSame) renderGroups(data.groups);
+  updateNav(); // re-evaluate buildBtn's scanning-gate regardless of whether groups changed
 });
 
 // Guards against a slow-resolving project load (e.g. the on-launch reload of the

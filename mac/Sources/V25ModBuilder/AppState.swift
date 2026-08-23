@@ -40,8 +40,16 @@ final class AppState: ObservableObject {
     }
 
     var canStartBuild: Bool {
-        canBuild && (!releaseEnabled || !releaseTag.trimmingCharacters(in: .whitespaces).isEmpty)
+        canBuild && !isScanningForNewGroups && (!releaseEnabled || !releaseTag.trimmingCharacters(in: .whitespaces).isEmpty)
     }
+
+    // Remembers, per project (this app session only - not persisted), the exact set of
+    // candidate mod folders the last scan already tried. Mirrors main.js's
+    // scannedCandidatesByProject: a folder whose robot is missing RobotPrefab/
+    // MainMenuPrefab never turns into a group no matter how many times Unity re-scans
+    // it, so without this a project with one such folder would re-run the full (slow -
+    // genuine Unity domain-reload wall-clock time) scan on every single load.
+    private var scannedCandidatesByProject: [String: String] = [:]
 
     /// Called once on launch - restores the remembered project/paths, same as the
     /// Electron app's startup `loadSettings().then(...)` block.
