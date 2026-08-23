@@ -20,7 +20,9 @@ jobs:
             glob: dist/*.msi
           - os: ubuntu-latest
             artifact: installer-linux
-            glob: dist/*.AppImage
+            glob: |
+              dist/*.AppImage
+              dist/*.pacman
 
     runs-on: ${{ matrix.os }}
 

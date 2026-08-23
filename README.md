@@ -63,7 +63,12 @@ npm run dist
 ```
 
 Uses `electron-builder` to produce an installer for whatever OS you run it
-on (`.msi` on Windows, `.dmg` on macOS, `.AppImage` on Linux). The Windows
+on (`.msi` on Windows, `.dmg` on macOS, `.AppImage` **and** `.pacman` on
+Linux). The `.pacman` package is the one to grab on Arch/CachyOS/Manjaro —
+install it with `sudo pacman -U "Mod Builder Installer Linux.pacman"` and it
+runs immediately, no `chmod +x` or `libfuse2` needed (that's only required
+for the AppImage, which is the portable fallback for non-Arch distros). The
+Windows
 installer is a full multi-page wizard (install location, Start Menu/desktop
 shortcut options) built on real Windows Installer (MSI), not a one-click
 NSIS installer — so re-running it over an existing install brings up the

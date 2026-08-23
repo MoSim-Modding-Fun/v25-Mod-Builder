@@ -152,7 +152,7 @@ async function autoRegisterNewModFolders(projectPath, unityPath) {
   const candidates = findCandidateModFolders(projectPath, listAddressableGroups(projectPath));
   if (candidates.length === 0) return;
 
-  await runUnityBuild(unityPath, [
+  await runUnityBuild(projectPath, unityPath, [
     '-batchmode', '-quit', '-nographics',
     '-projectPath', projectPath,
     '-executeMethod', 'Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine',
@@ -308,12 +308,26 @@ function moveFile(src, dest) {
   }
 }
 
-function runUnityBuild(unityPath, args) {
+function runUnityBuildProcess(unityPath, args) {
   return new Promise((resolve) => {
     const proc = spawn(unityPath, args, { windowsHide: false });
     proc.on('error', (err) => resolve({ code: -1, error: err.message }));
     proc.on('exit', (code) => resolve({ code }));
   });
+}
+
+// Unity refuses to open a project that's already locked by another instance of itself
+// (Temp/UnityLockfile) - so two Unity launches against the *same* project (e.g. the
+// auto-register-mod-folders scan racing a real build, which can otherwise overlap when
+// a project gets loaded/selected more than once in quick succession) fail with
+// "Multiple Unity instances cannot open the same project" instead of just queueing.
+// This serializes every Unity launch per projectPath so that never happens.
+const projectUnityLocks = new Map(); // projectPath -> tail promise of the queue
+function runUnityBuild(projectPath, unityPath, args) {
+  const previous = projectUnityLocks.get(projectPath) || Promise.resolve();
+  const run = previous.then(() => runUnityBuildProcess(unityPath, args), () => runUnityBuildProcess(unityPath, args));
+  projectUnityLocks.set(projectPath, run.catch(() => {}));
+  return run;
 }
 
 // Streams new lines appended to Unity's -logFile to the renderer as they're written,
@@ -383,7 +397,7 @@ ipcMain.handle('run-build', async (event, config) => {
       event.sender.send('build-log-line', { target: targetKey, line });
     });
 
-    const { code, error } = await runUnityBuild(unityPath, args);
+    const { code, error } = await runUnityBuild(projectPath, unityPath, args);
     stopTailing();
 
     let logContent = '';

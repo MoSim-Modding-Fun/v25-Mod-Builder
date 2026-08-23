@@ -163,10 +163,21 @@ function applyProjectInfo(info) {
   updateNav();
 }
 
-els.selectProjectBtn.addEventListener('click', async () => {
-  const info = await window.api.selectProject();
-  if (!info) return;
+// Guards against a slow-resolving project load (e.g. the on-launch reload of the
+// remembered project, which can block on an auto-register Unity launch) clobbering a
+// manual selection the user made in the meantime - only the most recent request's
+// result is ever applied.
+let projectRequestId = 0;
+
+async function loadAndApplyProject(loadPromise) {
+  const requestId = ++projectRequestId;
+  const info = await loadPromise;
+  if (requestId !== projectRequestId || !info) return;
   applyProjectInfo(info);
+}
+
+els.selectProjectBtn.addEventListener('click', () => {
+  loadAndApplyProject(window.api.selectProject());
 });
 
 els.browseUnityBtn.addEventListener('click', async () => {
@@ -565,8 +576,7 @@ window.api.onBuildLogLine((data) => {
 // survive across sessions regardless of where the app itself is installed).
 window.api.loadSettings().then(async (settings) => {
   if (settings.projectPath) {
-    const info = await window.api.loadProject(settings.projectPath);
-    if (info) applyProjectInfo(info);
+    await loadAndApplyProject(window.api.loadProject(settings.projectPath));
   }
   if (settings.unityPathOverride) {
     unityPath = settings.unityPathOverride;
