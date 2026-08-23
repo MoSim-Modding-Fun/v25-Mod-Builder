@@ -76,11 +76,17 @@ npm start
    declining cancels the build. (It never touches Unity processes the app
    started itself.) Launches are serialised per project, so nothing races for
    the project lock.
+
    Each platform gets its own full Addressables build (required since bundle
    naming settings are project-wide, not per-group) and is verified by
    checking that the expected `.zip` actually landed in `Mods/`, not just by
-   trusting Unity's exit code. If a platform fails, the run stops there —
-   fix the issue and re-run.
+   trusting Unity's exit code. If a platform fails, the run stops there.
+
+   A **RETRY** button then appears, which rebuilds only what didn't succeed —
+   the platform that failed plus any that never got to run. Platforms that
+   already built keep their green badge, their console output and their zips,
+   so fixing one platform doesn't cost you a full rebuild of the others (and a
+   GitHub release afterwards still attaches every platform's artifacts).
 
 ## Packaging (optional)
 
