@@ -91,7 +91,10 @@ struct ContentView: View {
         HStack(spacing: 6) {
             Button("BACK") { page -= 1 }
                 .buttonStyle(RufusButtonStyle())
-                .disabled(page == 0)
+                // Matches renderer.js's `els.backBtn.disabled = currentPage === 0 ||
+                // buildInProgress` - can't navigate away mid-build (would orphan the
+                // console/progress the user is watching).
+                .disabled(page == 0 || runner.isRunning)
 
             Spacer()
 
@@ -108,6 +111,12 @@ struct ContentView: View {
                 Button("START") { startBuild() }
                     .buttonStyle(StartButtonStyle(enabled: appState.canStartBuild))
                     .disabled(!appState.canStartBuild)
+            } else if page == 3, !runner.isRunning, !runner.platformsNeedingBuild.isEmpty {
+                // Mirrors renderer.js's retry-btn label: single failed platform names it
+                // (e.g. "RETRY WINDOWS"), otherwise "RETRY <n> FAILED" - see
+                // PLATFORM_LABELS / updateNav() in renderer.js.
+                Button(retryLabel) { retryBuild() }
+                    .buttonStyle(StartButtonStyle(enabled: true))
             }
 
             Button("CLOSE") { NSApplication.shared.terminate(nil) }
@@ -133,6 +142,16 @@ struct ContentView: View {
         }
     }
 
+    /// Mirrors renderer.js's PLATFORM_LABELS-based retry-btn label: `RETRY <PLATFORM>`
+    /// when exactly one platform still needs a build, else `RETRY <n> FAILED`.
+    private var retryLabel: String {
+        let pending = runner.platformsNeedingBuild
+        if pending.count == 1 {
+            return "RETRY \(pending[0].zipLabel.uppercased())"
+        }
+        return "RETRY \(pending.count) FAILED"
+    }
+
     private func startBuild() {
         guard let projectPath = appState.projectPath, let unityPath = appState.unityPath else { return }
         let platforms = PlatformTarget.allCases.filter { appState.selectedPlatforms.contains($0) }
@@ -146,18 +165,37 @@ struct ContentView: View {
                 platforms: platforms,
                 outputDir: appState.outputDir
             )
-            if appState.releaseEnabled {
-                if runner.allRequestedPlatformsSucceeded {
-                    activeConsoleTab = .release
-                    await runner.createGitHubRelease(
-                        tag: appState.releaseTag,
-                        title: appState.releaseTitle,
-                        notes: appState.releaseNotes
-                    )
-                } else {
-                    runner.releaseStatus = .failed
-                }
-            }
+            await releaseIfReady()
+        }
+    }
+
+    /// Re-runs just the platforms still owed a successful build (BuildRunner.retryFailed
+    /// leaves already-succeeded platforms' console/badges alone), then - same as
+    /// startBuild() - fires the GitHub release once every requested platform is green.
+    /// Without this, a build that fails, gets retried, and then fully succeeds would
+    /// silently skip the release step entirely, since the release logic otherwise only
+    /// ever runs right after the initial run() call in startBuild().
+    private func retryBuild() {
+        Task {
+            await runner.retryFailed()
+            await releaseIfReady()
+        }
+    }
+
+    /// Shared tail end of both startBuild() and retryBuild(): mirrors renderer.js's
+    /// runBuildFor() post-build release branch (`if (!buildContext.releaseEnabled)
+    /// return; if (stillFailing.length === 0) { ... } else { badge = skipped ... }`).
+    private func releaseIfReady() async {
+        guard appState.releaseEnabled else { return }
+        if runner.allRequestedPlatformsSucceeded {
+            activeConsoleTab = .release
+            await runner.createGitHubRelease(
+                tag: appState.releaseTag,
+                title: appState.releaseTitle,
+                notes: appState.releaseNotes
+            )
+        } else {
+            runner.releaseStatus = .failed
         }
     }
 }

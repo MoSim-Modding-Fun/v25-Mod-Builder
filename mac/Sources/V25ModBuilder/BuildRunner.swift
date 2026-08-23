@@ -16,10 +16,37 @@ final class BuildRunner: ObservableObject {
     @Published var currentPlatform: PlatformTarget?
 
     /// All successful platforms' output zip paths, in build order - the GitHub release
-    /// step's asset list.
-    @Published var allOutputPaths: [String] = []
+    /// step's asset list. Derived from outputPathsByPlatform in the ORIGINAL platform
+    /// order, so a retry that only rebuilds the failed platforms still releases every
+    /// platform's zips, not just the retried ones - mirrors renderer.js's
+    /// `buildContext.platforms.flatMap((p) => outputPathsByPlatform[p] || [])`.
+    var allOutputPaths: [String] {
+        requestedPlatforms.flatMap { outputPathsByPlatform[$0] ?? [] }
+    }
     @Published var releaseStatus: SegmentStatus = .pending
     @Published var releaseConsoleLines: [ConsoleLine] = []
+
+    // Everything a retry needs to re-run a subset of the original request unchanged -
+    // mirrors renderer.js's `buildContext` (groups/platforms/outputDir kept as-is across
+    // retries; only the platform SUBSET passed to runProcess changes).
+    private var requestedGroups: [ModGroup] = []
+    private var requestedPlatforms: [PlatformTarget] = []
+    private var requestedProjectPath: String = ""
+    private var requestedUnityPath: String = ""
+    private var requestedOutputDir: String?
+
+    // platform -> that platform's successful output zip paths, kept (not overwritten with
+    // an empty array) across a retry so allOutputPaths above can still cover platforms
+    // that succeeded on an earlier attempt. Mirrors renderer.js's outputPathsByPlatform.
+    private var outputPathsByPlatform: [PlatformTarget: [String]] = [:]
+
+    /// Platforms from the original request that haven't succeeded yet - the ones that
+    /// failed, plus any that never got to run because an earlier platform's failure
+    /// stopped the loop. Mirrors renderer.js's platformsNeedingBuild(). Drives both the
+    /// RETRY button's visibility/label in ContentView and retryFailed()'s platform list.
+    var platformsNeedingBuild: [PlatformTarget] {
+        requestedPlatforms.filter { platformStatus[$0] != .success }
+    }
 
     private let failureMarkers = [
         "error CS",
@@ -33,8 +60,13 @@ final class BuildRunner: ObservableObject {
         // Normalized the same way as ProjectService.resolveProjectFast() so this always
         // matches the key an in-flight auto-register scan for the same project is using.
         let projectPath = (rawProjectPath as NSString).standardizingPath
-        isRunning = true
-        defer { isRunning = false }
+
+        requestedGroups = groups
+        requestedPlatforms = platforms
+        requestedProjectPath = projectPath
+        requestedUnityPath = unityPath
+        requestedOutputDir = outputDir
+        outputPathsByPlatform = [:]
 
         let selectedGroups = groups.filter { $0.checked }
         progressSegments = platforms.flatMap { platform in
@@ -51,9 +83,46 @@ final class BuildRunner: ObservableObject {
             consoleLines[p] = []
             platformStatus[p] = .pending
         }
-        allOutputPaths = []
         releaseStatus = .pending
         releaseConsoleLines = []
+
+        await runPlatforms(platforms)
+    }
+
+    /// Re-runs only the platforms still owed a successful build (see
+    /// platformsNeedingBuild), reusing the groups/project/unity/outputDir from the
+    /// original run() call unchanged. Mirrors renderer.js's retry-btn click handler:
+    /// clears only the retried platforms' console lines, status badges, and progress
+    /// segments, leaving already-succeeded platforms' output on screen untouched.
+    func retryFailed() async {
+        let retryPlatforms = platformsNeedingBuild
+        guard !retryPlatforms.isEmpty else { return }
+
+        for p in retryPlatforms {
+            consoleLines[p] = []
+            platformStatus[p] = .pending
+        }
+        for idx in progressSegments.indices where retryPlatforms.contains(progressSegments[idx].platform) {
+            progressSegments[idx].status = .pending
+        }
+        // A previous attempt may have already marked the release failed/skipped; a
+        // retry gives it another chance once the platforms it depends on succeed.
+        releaseStatus = .pending
+
+        await runPlatforms(retryPlatforms)
+    }
+
+    /// Shared by run() and retryFailed(): actually drives Unity for the given platform
+    /// subset. Split out so a retry can pass just the still-failing platforms without
+    /// duplicating the pre-flight check, per-platform loop, or output-move logic.
+    private func runPlatforms(_ platforms: [PlatformTarget]) async {
+        let projectPath = requestedProjectPath
+        let unityPath = requestedUnityPath
+        let outputDir = requestedOutputDir
+        let selectedGroups = requestedGroups.filter { $0.checked }
+
+        isRunning = true
+        defer { isRunning = false }
 
         // The build runs entirely through the bundled Editor script's -executeMethod entry
         // points, and the public template project doesn't ship that script - so make sure
@@ -157,13 +226,16 @@ final class BuildRunner: ObservableObject {
                 for p in finalPaths {
                     appendLine(platform: platform, text: p, kind: .success)
                 }
-                allOutputPaths.append(contentsOf: finalPaths)
+                outputPathsByPlatform[platform] = finalPaths
             }
         }
     }
 
+    /// True once every platform from the ORIGINAL request (not just this attempt's
+    /// subset) has a success outcome - stays correct across a retry because
+    /// platformStatus for already-succeeded platforms is never touched by retryFailed().
     var allRequestedPlatformsSucceeded: Bool {
-        !platformStatus.isEmpty && platformStatus.values.allSatisfy { $0 == .success }
+        !requestedPlatforms.isEmpty && requestedPlatforms.allSatisfy { platformStatus[$0] == .success }
     }
 
     /// Mirrors main.js's `create-github-release` IPC handler: always releases to the

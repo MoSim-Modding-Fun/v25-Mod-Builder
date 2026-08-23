@@ -485,12 +485,10 @@ async function runBuildFor(platforms) {
     }
 
     const stillFailing = platformsNeedingBuild();
-    if (stillFailing.length > 0) {
-      for (const p of stillFailing) {
-        if (!platformOutcome[p]) {
-          // Never ran: the run stopped at an earlier platform's failure.
-          appendConsoleLine(p, 'Skipped: an earlier platform failed, so this one never ran.', 'summary-failed');
-        }
+    for (const p of stillFailing) {
+      // No recorded outcome means it never ran - the loop stopped at an earlier failure.
+      if (!platformOutcome[p]) {
+        appendConsoleLine(p, 'Skipped: an earlier platform failed, so this one never ran.', 'summary-failed');
       }
     }
 
@@ -504,6 +502,15 @@ async function runBuildFor(platforms) {
       if (badge) { badge.textContent = 'skipped'; badge.className = 'badge failed'; }
       appendConsoleLine(RELEASE_KEY, 'Skipped: not every platform built successfully.', 'summary-failed');
     }
+  } catch (err) {
+    // The IPC call itself failed rather than the build reporting a failure. Surface it
+    // instead of leaving the page looking like nothing happened; the platforms keep
+    // their unfinished state, so RETRY still offers to run them again.
+    for (const p of platforms) {
+      const badge = document.getElementById(`badge-${p}`);
+      if (badge && badge.textContent !== 'success') { badge.textContent = 'failed'; badge.className = 'badge failed'; }
+    }
+    appendConsoleLine(platforms[0], `Build could not be started: ${err.message}`, 'summary-failed');
   } finally {
     buildInProgress = false;
     updateNav();
