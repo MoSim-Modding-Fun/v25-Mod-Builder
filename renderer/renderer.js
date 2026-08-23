@@ -38,6 +38,7 @@ const els = {
   backBtn: document.getElementById('back-btn'),
   nextBtn: document.getElementById('next-btn'),
   buildBtn: document.getElementById('build-btn'),
+  retryBtn: document.getElementById('retry-btn'),
   closeBtn: document.getElementById('close-btn'),
   buildStatus: document.getElementById('build-status'),
   progressBar: document.getElementById('progress-bar'),
@@ -72,8 +73,6 @@ function showPage(index) {
 }
 
 function updateNav() {
-  els.backBtn.disabled = currentPage === 0;
-
   const projectReady = Boolean(projectPath && unityPath);
   const anyGroupSelected = Object.values(groupsState).some((g) => g.checked);
   const anyPlatformSelected = getSelectedPlatforms().length > 0;
@@ -96,6 +95,18 @@ function updateNav() {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = 'none';
   }
+
+  // Build page only: offer a retry for whatever didn't succeed, so a single failed
+  // platform doesn't mean rebuilding the ones that already worked.
+  const failed = currentPage === PAGE_IDS.length - 1 ? platformsNeedingBuild() : [];
+  const showRetry = failed.length > 0 && !buildInProgress;
+  els.retryBtn.style.display = showRetry ? '' : 'none';
+  if (showRetry) {
+    els.retryBtn.textContent = failed.length === 1
+      ? `RETRY ${PLATFORM_LABELS[failed[0]].toUpperCase()}`
+      : `RETRY ${failed.length} FAILED`;
+  }
+  els.backBtn.disabled = currentPage === 0 || buildInProgress;
 
   renderOutputInfo();
   renderZipPreview();
@@ -375,14 +386,31 @@ els.releaseTagField.addEventListener('input', updateNav);
 
 // ---------- Build ----------
 
-els.buildBtn.addEventListener('click', async () => {
+// Everything a retry needs to re-run a subset of the original request unchanged.
+let buildContext = null; // { groups, platforms, releaseEnabled }
+let platformOutcome = {}; // platformKey -> 'success' | 'failed' | 'pending'
+let outputPathsByPlatform = {}; // platformKey -> [zip paths], kept so a retry can still
+                                // release every platform's output, not just the retried one
+let buildInProgress = false;
+
+// Platforms still owed a successful build: the ones that failed, plus any that never got
+// to run because an earlier platform failed and stopped the run.
+function platformsNeedingBuild() {
+  if (!buildContext) return [];
+  return buildContext.platforms.filter((p) => platformOutcome[p] !== 'success');
+}
+
+els.buildBtn.addEventListener('click', () => {
   const selectedGroups = Object.entries(groupsState)
     .filter(([, g]) => g.checked)
     .map(([name, g]) => ({ name, version: g.version, zipName: g.zipName }));
   const platforms = getSelectedPlatforms();
-  const releaseEnabled = els.releaseEnabledCheck.checked;
 
-  renderConsoleTabs(releaseEnabled ? [...platforms, RELEASE_KEY] : platforms);
+  buildContext = { groups: selectedGroups, platforms, releaseEnabled: els.releaseEnabledCheck.checked };
+  platformOutcome = {};
+  outputPathsByPlatform = {};
+
+  renderConsoleTabs(buildContext.releaseEnabled ? [...platforms, RELEASE_KEY] : platforms);
   renderProgressSegments(selectedGroups, platforms);
 
   els.buildStatus.innerHTML = '';
@@ -392,7 +420,7 @@ els.buildBtn.addEventListener('click', async () => {
     row.innerHTML = `<span>${PLATFORM_LABELS[p]}</span> <span class="badge pending" id="badge-${p}">pending</span>`;
     els.buildStatus.appendChild(row);
   }
-  if (releaseEnabled) {
+  if (buildContext.releaseEnabled) {
     const row = document.createElement('div');
     row.className = 'platform-row';
     row.innerHTML = `<span>${RELEASE_LABEL}</span> <span class="badge pending" id="badge-${RELEASE_KEY}">pending</span>`;
@@ -400,30 +428,87 @@ els.buildBtn.addEventListener('click', async () => {
   }
 
   showPage(PAGE_IDS.length - 1); // jump to the Build page so progress is visible immediately
-
-  const results = await window.api.runBuild({ projectPath, unityPath, groups: selectedGroups, platforms, outputDir });
-
-  const outputPaths = [];
-  let allSucceeded = true;
-  for (const r of results) {
-    appendConsoleLine(r.target, `=== ${r.target} : ${r.status.toUpperCase()} ===`, r.status === 'success' ? 'summary-success' : 'summary-failed');
-    if (r.reason) appendConsoleLine(r.target, `Reason: ${r.reason}`, 'summary-failed');
-    if (r.status === 'success' && r.outputPaths) {
-      for (const p of r.outputPaths) appendConsoleLine(r.target, p, 'summary-success');
-      outputPaths.push(...r.outputPaths);
-    }
-    appendConsoleLine(r.target, 'Full history logged to Tools/build-logs/modbuilder.log in the project.');
-    if (r.status !== 'success') allSucceeded = false;
-  }
-
-  if (releaseEnabled && allSucceeded && outputPaths.length > 0) {
-    await runGitHubRelease(outputPaths);
-  } else if (releaseEnabled && !allSucceeded) {
-    const badge = document.getElementById(`badge-${RELEASE_KEY}`);
-    if (badge) { badge.textContent = 'skipped'; badge.className = 'badge failed'; }
-    appendConsoleLine(RELEASE_KEY, 'Skipped: not every platform built successfully.', 'summary-failed');
-  }
+  runBuildFor(platforms);
 });
+
+els.retryBtn.addEventListener('click', () => {
+  const retryPlatforms = platformsNeedingBuild();
+  if (retryPlatforms.length === 0) return;
+
+  // Clear only the retried platforms' consoles and progress, so a successful platform's
+  // log and green badge from the first run stay on screen.
+  for (const p of retryPlatforms) {
+    const panel = consolePanelsByPlatform[p];
+    if (panel) {
+      for (const line of Array.from(panel.querySelectorAll('.console-line'))) line.remove();
+    }
+    const badge = document.getElementById(`badge-${p}`);
+    if (badge) { badge.textContent = 'pending'; badge.className = 'badge pending'; }
+  }
+  for (const seg of progressSegments) {
+    if (retryPlatforms.includes(seg.platform)) seg.status = 'pending';
+  }
+  renderProgressBar();
+
+  if (buildContext.releaseEnabled) {
+    const badge = document.getElementById(`badge-${RELEASE_KEY}`);
+    if (badge) { badge.textContent = 'pending'; badge.className = 'badge pending'; }
+  }
+
+  runBuildFor(retryPlatforms);
+});
+
+async function runBuildFor(platforms) {
+  buildInProgress = true;
+  updateNav();
+  try {
+    const results = await window.api.runBuild({
+      projectPath,
+      unityPath,
+      groups: buildContext.groups,
+      platforms,
+      outputDir,
+    });
+
+    for (const r of results) {
+      // A pre-flight failure (bad Unity path, exporter script couldn't be installed)
+      // comes back with target: null - it isn't scoped to one platform.
+      const target = r.target || platforms[0];
+      appendConsoleLine(target, `=== ${target} : ${r.status.toUpperCase()} ===`, r.status === 'success' ? 'summary-success' : 'summary-failed');
+      if (r.reason || r.error) appendConsoleLine(target, `Reason: ${r.reason || r.error}`, 'summary-failed');
+      if (r.status === 'success' && r.outputPaths) {
+        for (const p of r.outputPaths) appendConsoleLine(target, p, 'summary-success');
+        outputPathsByPlatform[target] = r.outputPaths;
+      }
+      appendConsoleLine(target, 'Full history logged to Tools/build-logs/modbuilder.log in the project.');
+      platformOutcome[target] = r.status === 'success' ? 'success' : 'failed';
+    }
+
+    const stillFailing = platformsNeedingBuild();
+    if (stillFailing.length > 0) {
+      for (const p of stillFailing) {
+        if (!platformOutcome[p]) {
+          // Never ran: the run stopped at an earlier platform's failure.
+          appendConsoleLine(p, 'Skipped: an earlier platform failed, so this one never ran.', 'summary-failed');
+        }
+      }
+    }
+
+    if (!buildContext.releaseEnabled) return;
+    if (stillFailing.length === 0) {
+      // Release every platform's zips, including ones that succeeded on an earlier attempt.
+      const allPaths = buildContext.platforms.flatMap((p) => outputPathsByPlatform[p] || []);
+      if (allPaths.length > 0) await runGitHubRelease(allPaths);
+    } else {
+      const badge = document.getElementById(`badge-${RELEASE_KEY}`);
+      if (badge) { badge.textContent = 'skipped'; badge.className = 'badge failed'; }
+      appendConsoleLine(RELEASE_KEY, 'Skipped: not every platform built successfully.', 'summary-failed');
+    }
+  } finally {
+    buildInProgress = false;
+    updateNav();
+  }
+}
 
 async function runGitHubRelease(files) {
   activateConsoleTab(RELEASE_KEY);
