@@ -39,8 +39,14 @@ function ensureExporterScriptInstalled(projectPath) {
     existing = fs.readFileSync(target, 'utf8');
   } catch { /* not installed yet */ }
 
-  if (existing !== null && exporterScriptVersion(existing) >= exporterScriptVersion(bundled)) {
-    return { status: 'current' };
+  if (existing !== null) {
+    // Compare content, not just the version marker: gating purely on the version means
+    // any edit that forgets to bump it silently never reaches the project, which is a
+    // trap during development and would ship a stale script if a bump were ever missed.
+    if (existing === bundled) return { status: 'current' };
+    // A newer marker than we carry means some future build of the app installed it -
+    // don't downgrade it back.
+    if (exporterScriptVersion(existing) > exporterScriptVersion(bundled)) return { status: 'current' };
   }
 
   try {

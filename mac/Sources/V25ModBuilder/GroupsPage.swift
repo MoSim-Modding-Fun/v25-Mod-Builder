@@ -16,9 +16,14 @@ struct GroupsPage: View {
                 } else {
                     ForEach($appState.groups) { $group in
                         VStack(alignment: .leading, spacing: 4) {
-                            Toggle(group.name, isOn: $group.checked)
-                                .toggleStyle(.checkbox)
-                                .font(.system(size: 12))
+                            HStack(spacing: 0) {
+                                Toggle(group.name, isOn: $group.checked)
+                                    .toggleStyle(.checkbox)
+                                    .font(.system(size: 12))
+                                if appState.unregisteredModFolders.contains(group.name) {
+                                    NewBadge()
+                                }
+                            }
                             if group.checked {
                                 HStack(spacing: 8) {
                                     VStack(alignment: .leading, spacing: 2) {
@@ -36,6 +41,22 @@ struct GroupsPage: View {
                         .padding(.vertical, 2)
                     }
                 }
+
+                // DETECT NEW MODS: a pure filesystem read (see ProjectService.
+                // detectUnregisteredModFolders) - it never launches Unity and never
+                // creates a group itself. A folder only becomes a real group if the user
+                // checks it above and builds it (EnsureModGroupRegistered on the Unity
+                // side does the actual creation at build time). Mirrors renderer.js's
+                // detect-row/detect-mods-btn/detect-status.
+                HStack(spacing: 8) {
+                    Button("DETECT NEW MODS") { appState.detectNewMods() }
+                        .buttonStyle(RufusButtonStyle())
+                        .disabled(appState.projectPath == nil)
+                    Text(appState.detectStatus)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.dim)
+                }
+                .padding(.top, 6)
             }
 
             RufusGroupBox(title: "Platforms") {
@@ -70,5 +91,23 @@ struct GroupsPage: View {
             }
 
         }
+    }
+}
+
+/// Marks a mod folder DETECT found that has no addressable group yet - one only gets
+/// created if the user actually builds it. Mirrors the Electron app's `.new-badge`
+/// (small blue pill, uppercase white text) in styles.css.
+private struct NewBadge: View {
+    var body: some View {
+        Text("NEW")
+            .font(.system(size: 9, weight: .semibold))
+            .tracking(0.4)
+            .foregroundColor(.white)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(Theme.accentBlue)
+            .cornerRadius(2)
+            .padding(.leading, 6)
+            .help("Not an addressable group yet - one gets created if you build it.")
     }
 }

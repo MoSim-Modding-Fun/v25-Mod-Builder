@@ -42,7 +42,9 @@ function createWindow() {
     minHeight: 260,
     // Windows taskbar/title-bar icons render blurry from a single arbitrary-size PNG
     // (it just gets scaled on the fly) - the multi-resolution .ico renders crisp instead.
-    icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    // Elsewhere, the pre-sized 512px copy rather than the 2134px source: identical at
+    // icon scale, without decoding ~18 MB of RGBA to draw a 32px title-bar icon.
+    icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icons/512x512.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -186,38 +188,12 @@ function findCandidateModFolders(projectPath) {
     .map((e) => e.name);
 }
 
-// Runs Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine, which scans
-// RobotsRoot for folders with a robot that can actually load and spawn (RobotPrefab +
-// MainMenuPrefab both set on some RobotMetadataSO) and turns any new ones into a proper
-// Addressable mod group + modpack metadata asset. Best-effort: any failure here just
-// means new folders won't show up as groups yet, not a fatal project-load error.
-async function autoRegisterNewModFolders(projectPath, unityPath) {
-  if (!unityPath || !fs.existsSync(unityPath)) return;
-  const candidates = findCandidateModFolders(projectPath);
-  if (candidates.length === 0) return;
-
-  const install = ensureExporterScriptInstalled(projectPath);
-  if (install.status === 'failed') {
-    console.error(`auto-register skipped: ${install.error}`);
-    return;
-  }
-
-  await runUnityBuild(projectPath, unityPath, [
-    '-batchmode', '-quit', '-nographics',
-    '-projectPath', projectPath,
-    '-executeMethod', 'Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine',
-  ]);
-}
-
-// The project the renderer most recently asked to load - lets a slow background scan
-// (see below) tell whether its result is still relevant before pushing it, in case the
-// user picked a different project while the scan was running.
+// The project the renderer most recently asked to load.
 let currentProjectPath = null;
 
-// Fast, synchronous-only project read: no Unity launch, so the UI can populate
-// immediately instead of blocking on autoRegisterNewModFolders (which can take real
-// wall-clock time - launching Unity headless). Shared by the dialog-driven picker and
-// by restoring the last-used project on launch, so they can't drift apart.
+// Filesystem-only project read - no Unity launch anywhere in the project-loading path,
+// so selecting a project is instant. Shared by the dialog-driven picker and by restoring
+// the last-used project on launch, so they can't drift apart.
 function resolveProjectFast(projectPath) {
   // A trailing slash (the folder picker can hand back either form depending on
   // platform/GTK version) would otherwise make the same project look like two
@@ -240,61 +216,34 @@ function resolveProjectFast(projectPath) {
 
   const detectedUnityPath = unityVersion ? detectUnity(unityVersion) : null;
   const groups = listAddressableGroups(projectPath);
-  const needsScan = findCandidateModFolders(projectPath).length > 0;
 
-  return { projectPath, unityVersion, groups, detectedUnityPath, scanning: needsScan };
+  return { projectPath, unityVersion, groups, detectedUnityPath };
 }
 
-// Runs after the fast result is already on screen: does the (possibly slow) Unity
-// auto-register pass, then pushes any newly-discovered groups to the renderer. Ignored
-// if the user has since loaded a different project.
-async function scanForNewGroupsInBackground(projectPath, unityPath) {
-  try {
-    await autoRegisterNewModFolders(projectPath, unityPath);
-  } catch (err) {
-    // Best-effort: a failed scan just means new folders aren't registered yet.
-    console.error(`auto-register scan failed: ${err.message}`);
-  } finally {
-    // Always report completion, even on failure - the renderer gates the BUILD button on
-    // "not currently scanning", so a swallowed error here would disable it permanently.
-    if (projectPath === currentProjectPath && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('project-scan-complete', {
-        projectPath,
-        groups: listAddressableGroups(projectPath),
-      });
-    }
+// Mod folders that exist on disk but aren't in any addressable group yet. Purely a
+// filesystem read - no Unity launch - so the DETECT button is instant. Nothing is
+// created here: an unregistered folder only becomes a real addressable group if the user
+// actually picks it and builds it (see EnsureModGroupRegistered in the exporter script).
+ipcMain.handle('detect-new-mods', (_event, rawProjectPath) => {
+  const projectPath = path.resolve(rawProjectPath);
+  if (!fs.existsSync(projectPath)) {
+    return { error: `Project "${projectPath}" no longer exists.` };
   }
-}
-
-// Remembers, per project (for this app session only - not persisted), the exact set of
-// candidate mod folders the last scan already tried. A folder whose robot is missing
-// RobotPrefab/MainMenuPrefab never turns into a group no matter how many times Unity
-// re-scans it, so without this a project with one such folder would re-run the full
-// (slow - genuine Unity domain-reload wall-clock time) scan on every single load.
-const scannedCandidatesByProject = new Map();
+  return { projectPath, unregistered: findCandidateModFolders(projectPath) };
+});
 
 function loadProject(rawProjectPath) {
   const fast = resolveProjectFast(rawProjectPath);
   if (fast.error) return fast;
 
   // fast.projectPath is normalized (see resolveProjectFast) - use it from here on, not
-  // rawProjectPath, or a trailing-slash difference would make the background scan use a
-  // different Unity-launch-queue key than a later build for the same project.
+  // rawProjectPath, or a trailing-slash difference would make the same project look like
+  // two different keys to the per-project Unity launch queue.
   const projectPath = fast.projectPath;
   currentProjectPath = projectPath;
   const settings = loadSettings();
   settings.projectPath = projectPath;
   saveSettings(settings);
-
-  if (fast.scanning) {
-    const candidateSignature = findCandidateModFolders(projectPath).sort().join('|');
-    if (scannedCandidatesByProject.get(projectPath) === candidateSignature) {
-      fast.scanning = false; // already tried scanning this exact set of folders this session
-    } else {
-      scannedCandidatesByProject.set(projectPath, candidateSignature);
-      scanForNewGroupsInBackground(projectPath, settings.unityPathOverride || fast.detectedUnityPath);
-    }
-  }
 
   return fast;
 }

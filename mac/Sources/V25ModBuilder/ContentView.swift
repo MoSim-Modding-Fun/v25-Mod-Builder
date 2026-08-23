@@ -36,7 +36,6 @@ struct ContentView: View {
         }
         .onChange(of: page) { _ in resizeForCurrentPage() }
         .onChange(of: appState.groups) { _ in if page == 1 || page == 2 { resizeForCurrentPage() } }
-        .onChange(of: appState.isScanningForNewGroups) { _ in if page == 0 { resizeForCurrentPage() } }
         .onChange(of: appState.selectedPlatforms) { _ in if page != 0 { resizeForCurrentPage() } }
         .onChange(of: appState.releaseEnabled) { _ in if page == 2 { resizeForCurrentPage() } }
         .onChange(of: runner.currentPlatform) { newValue in
@@ -56,7 +55,9 @@ struct ContentView: View {
         case 0:
             height = 312
         case 1:
-            let baseline: CGFloat = 272
+            // +26 over the old baseline for the DETECT NEW MODS button/status row added
+            // under the groups list (mirrors renderer.js's .detect-row).
+            let baseline: CGFloat = 298
             let perGroup: CGFloat = 24
             let perExpandedExtra: CGFloat = 66
             height = baseline + appState.groups.reduce(0) { $0 + perGroup + ($1.checked ? perExpandedExtra : 0) }

@@ -12,13 +12,22 @@ A small cross-platform (Windows/macOS/Linux) Electron GUI for building and
 exporting MoSimulator addressable mod groups, without hand-running the
 `Tools/build-mods-all-platforms.ps1` script in the MoSim-Reefscape-Public repo.
 
-It drives the existing `Editor.AddressablesModExporter.BuildFromCommandLine`
-method already in that Unity project — it doesn't change anything in the
-Unity project itself. That C# method is what actually sets the per-group
-bundle-naming prefix, builds addressables, copies the platform catalog files
-+ robot DLLs into `Mods/<GroupName>/`, and zips the result. This app just
+It drives `Editor.AddressablesModExporter.BuildFromCommandLine` in that Unity
+project. That C# method is what actually sets the per-group bundle-naming
+prefix and build/load paths, builds addressables, copies the platform catalog
+files + robot DLLs into `Mods/<GroupName>/`, and zips the result. This app
 launches Unity headless with the right arguments, once per selected platform,
 and shows you progress/logs.
+
+**That Editor script ships with this app** (`unity/AddressablesModExporter.cs`)
+and is installed into `<project>/Assets/Editor/` automatically the first time
+the app needs it, then kept up to date by a version marker in the file. That's
+deliberate: the public template project everyone clones
+([MoSimulator/MoSimulator-Public](https://github.com/MoSimulator/MoSimulator-Public))
+doesn't contain it, so requiring people to add it by hand would mean the app
+simply doesn't work on a fresh clone. It's the one file the app writes into
+your Unity project — don't hand-edit the installed copy, since it gets
+overwritten; edit `unity/AddressablesModExporter.cs` here instead.
 
 ## Setup
 
@@ -31,14 +40,16 @@ npm start
 
 ## Using it
 
-1. **Select Unity Project** — pick the root of a Unity project that has
-   `Editor.AddressablesModExporter` (i.e. MoSim-Reefscape-Public, or any repo
-   with that same Editor script). The app reads the required Unity Editor
-   version from `ProjectSettings/ProjectVersion.txt` and lists every
-   Addressable group it finds under `Assets/AddressableAssetsData/AssetGroups/`,
-   except Unity's own default groups and `LynkMod` (the example/template mod
-   bundled in the repo, not something meant to be built and shipped). The
-   project is remembered and reopened automatically next launch.
+1. **Select Unity Project** — pick the root of a MoSimulator Unity project
+   (a clone of the public template, or MoSim-Reefscape-Public). The app reads
+   the required Unity Editor version from `ProjectSettings/ProjectVersion.txt`
+   and lists every Addressable group it finds under
+   `Assets/AddressableAssetsData/AssetGroups/`, except Unity's own default
+   groups and the example/template mods (`LynkMod`, `LynkModOfficial`,
+   `MechTechMod`) that ship in the repo rather than being something to build
+   and distribute. This is all filesystem reads, so it's instant — selecting
+   a project never launches Unity. The project is remembered and reopened
+   automatically next launch.
 2. **Unity Editor** — the app tries the standard Unity Hub install path for
    the required version on your OS. If it's not found (or you want a
    different install), click **Browse for Unity Editor...** and point it at
@@ -47,9 +58,24 @@ npm start
 3. **Groups to build** — check the group(s) you want. Each checked group
    gets its own optional **Version** and **Zip name override** fields (same
    as the `-Versions`/`-ZipNames` options in the PowerShell script).
+
+   **DETECT NEW MODS** lists mod folders under
+   `Assets/Prefabs/Reefscape/Robots/Mods/` that don't have an Addressable
+   group yet, tagged `NEW`. That's a plain filesystem check — it doesn't
+   launch Unity and doesn't create anything. A `NEW` folder only becomes a
+   real Addressable group (with its `modpack_metadata` label and build/load
+   paths set) if you actually check it and build it, so mods you never build
+   never clutter the project. Matching is by asset GUID, not by name, so a
+   group whose name has drifted from its folder name is still recognised as
+   already registered.
 4. **Platforms** — Windows/macOS/Linux, all checked by default. Uncheck any
    you don't need this run.
 5. **Build** — launches Unity headless once per selected platform, in order.
+   Unity can't open a project that's already open in the Editor, so if it is,
+   the app offers to close that Editor for you rather than failing outright —
+   declining cancels the build. (It never touches Unity processes the app
+   started itself.) Launches are serialised per project, so nothing races for
+   the project lock.
    Each platform gets its own full Addressables build (required since bundle
    naming settings are project-wide, not per-group) and is verified by
    checking that the expected `.zip` actually landed in `Mods/`, not just by

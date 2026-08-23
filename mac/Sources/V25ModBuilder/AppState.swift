@@ -12,7 +12,14 @@ final class AppState: ObservableObject {
     @Published var unityVersion: String?
     @Published var projectError: String?
     @Published var groups: [ModGroup] = []
-    @Published var isScanningForNewGroups = false
+
+    // Backing state for the DETECT NEW MODS button - mirrors renderer.js's
+    // registeredGroupNames/unregisteredModFolders globals. `groups` (above) is the
+    // merged, sorted, buildable list shown in the UI; these two track the raw pieces so
+    // a re-detect or a toggle can recompute that merge without re-reading the project.
+    @Published var registeredGroupNames: [String] = []
+    @Published var unregisteredModFolders: [String] = []
+    @Published var detectStatus: String = ""
 
     @Published var unityPath: String?
     @Published var detectedUnityPath: String?
@@ -40,16 +47,8 @@ final class AppState: ObservableObject {
     }
 
     var canStartBuild: Bool {
-        canBuild && !isScanningForNewGroups && (!releaseEnabled || !releaseTag.trimmingCharacters(in: .whitespaces).isEmpty)
+        canBuild && (!releaseEnabled || !releaseTag.trimmingCharacters(in: .whitespaces).isEmpty)
     }
-
-    // Remembers, per project (this app session only - not persisted), the exact set of
-    // candidate mod folders the last scan already tried. Mirrors main.js's
-    // scannedCandidatesByProject: a folder whose robot is missing RobotPrefab/
-    // MainMenuPrefab never turns into a group no matter how many times Unity re-scans
-    // it, so without this a project with one such folder would re-run the full (slow -
-    // genuine Unity domain-reload wall-clock time) scan on every single load.
-    private var scannedCandidatesByProject: [String: String] = [:]
 
     /// Called once on launch - restores the remembered project/paths, same as the
     /// Electron app's startup `loadSettings().then(...)` block.
@@ -76,41 +75,29 @@ final class AppState: ObservableObject {
         loadProject(at: url.path)
     }
 
-    /// Populates the UI immediately from the fast, filesystem-only read, then - only if
-    /// needed - runs the slower Unity auto-register scan in the background and merges
-    /// in any newly-discovered groups when it finishes. Mirrors main.js's
-    /// loadProject()/scanForNewGroupsInBackground() split, so a slow scan (launching
-    /// Unity headless) never blocks the initial "project selected" feedback.
+    /// Pure filesystem read, same as main.js's loadProject() - nothing here launches
+    /// Unity, so selecting a project is instant. There is no background scan to kick off
+    /// anymore: a mod folder without a group just sits there until the user explicitly
+    /// hits DETECT NEW MODS (see detectNewMods() below) and then builds it.
     private func loadProject(at rawPath: String) {
         let info = ProjectService.resolveProjectFast(at: rawPath)
         applyProject(info)
-
-        guard info.error == nil, info.scanning else { return }
-        // Use info.projectPath (normalized by resolveProjectFast), not rawPath - they
-        // can differ by a trailing slash, which would make the `self.projectPath ==
-        // path` check below always fail and silently drop every scan result.
-        let path = info.projectPath
-        let scanUnityPath = unityPath
-        Task {
-            let refreshedGroups = await ProjectService.scanForNewGroups(projectPath: path, unityPath: scanUnityPath)
-            // The user may have loaded a different project while this scan was running -
-            // only apply the result if it's still the one on screen.
-            guard self.projectPath == path else { return }
-            self.isScanningForNewGroups = false
-            let existingNames = Set(self.groups.map(\.name))
-            guard Set(refreshedGroups) != existingNames else { return }
-            self.groups = refreshedGroups.map { ModGroup(name: $0) }
-        }
     }
 
     private func applyProject(_ info: ProjectInfo) {
         projectPath = info.projectPath
         unityVersion = info.unityVersion
         projectError = info.error
-        isScanningForNewGroups = info.scanning
+
+        // A detect result from a previously-loaded project says nothing about this one -
+        // mirrors applyProjectInfo() in renderer.js clearing unregisteredModFolders/
+        // detectStatus on every project (re)load.
+        unregisteredModFolders = []
+        detectStatus = ""
 
         if info.error == nil {
             defaults.set(info.projectPath, forKey: Keys.projectPath)
+            registeredGroupNames = info.groups
             groups = info.groups.map { ModGroup(name: $0) }
 
             if let version = info.unityVersion {
@@ -123,8 +110,35 @@ final class AppState: ObservableObject {
                 }
             }
         } else {
+            registeredGroupNames = []
             groups = []
         }
+    }
+
+    /// Lists mod folders that exist on disk but have no addressable group yet - a pure
+    /// filesystem read, so this is instant and (crucially) does not launch Unity and does
+    /// not create anything. Mirrors renderer.js's detect-mods-btn click handler. A folder
+    /// only becomes a real group if the user checks it here and then builds it (see
+    /// EnsureModGroupRegistered in AddressablesModExporter.cs).
+    func detectNewMods() {
+        guard let projectPath else { return }
+
+        let unregistered = ProjectService.detectUnregisteredModFolders(projectPath: projectPath)
+        unregisteredModFolders = unregistered
+        rebuildGroupsList()
+        detectStatus = unregistered.isEmpty
+            ? "No unregistered mod folders found."
+            : "Found \(unregistered.count) new mod folder(s) - check one to build it."
+    }
+
+    /// Merges registered group names with DETECT-found unregistered folders into the
+    /// single checkable list the Groups page shows, preserving any in-progress
+    /// checked/version/zipName state for names that survive the merge. Mirrors
+    /// renderer.js's renderGroups(): `[...new Set([...names, ...unregisteredNames])].sort()`.
+    private func rebuildGroupsList() {
+        let mergedNames = Array(Set(registeredGroupNames).union(unregisteredModFolders)).sorted()
+        let existingByName = Dictionary(uniqueKeysWithValues: groups.map { ($0.name, $0) })
+        groups = mergedNames.map { existingByName[$0] ?? ModGroup(name: $0) }
     }
 
     func browseUnityPath() {

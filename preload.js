@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   loadSettings: () => ipcRenderer.invoke('load-settings'),
   selectProject: () => ipcRenderer.invoke('select-project'),
   loadProject: (projectPath) => ipcRenderer.invoke('load-project', projectPath),
+  detectNewMods: (projectPath) => ipcRenderer.invoke('detect-new-mods', projectPath),
   browseUnityPath: () => ipcRenderer.invoke('browse-unity-path'),
   browseOutputFolder: () => ipcRenderer.invoke('browse-output-folder'),
   listGroups: (projectPath) => ipcRenderer.invoke('list-groups', projectPath),
@@ -15,8 +16,5 @@ contextBridge.exposeInMainWorld('api', {
   },
   onBuildLogLine: (callback) => {
     ipcRenderer.on('build-log-line', (_event, data) => callback(data));
-  },
-  onProjectScanComplete: (callback) => {
-    ipcRenderer.on('project-scan-complete', (_event, data) => callback(data));
   },
 });

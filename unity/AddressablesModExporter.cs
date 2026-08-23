@@ -1,4 +1,4 @@
-// MODBUILDER-SCRIPT-VERSION: 2
+// MODBUILDER-SCRIPT-VERSION: 4
 //
 // This file is INSTALLED AND MAINTAINED BY v25 Mod Builder. It is copied into
 // <UnityProject>/Assets/Editor/ automatically, and overwritten whenever the app ships a
@@ -75,7 +75,7 @@ namespace Editor
             foreach (var group in settings.groups)
             {
                 if (group == null || group.ReadOnly) continue;
-                if (group.GetSchema<BundledAssetGroupSchema>() == null) continue;
+                if (SafeGetBundledSchema(group) == null) continue;
 
                 var name = group.Name;
                 bool was = _selected.Contains(name);
@@ -162,9 +162,17 @@ namespace Editor
             foreach (var group in settings.groups)
             {
                 if (group == null) continue;
-                foreach (var entry in group.entries)
+                try
                 {
-                    if (entry != null && !string.IsNullOrEmpty(entry.guid)) registeredGuids.Add(entry.guid);
+                    foreach (var entry in group.entries)
+                    {
+                        if (entry != null && !string.IsNullOrEmpty(entry.guid)) registeredGuids.Add(entry.guid);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Same broken-group case SafeGetBundledSchema documents.
+                    Debug.LogWarning($"Skipping unreadable addressable group '{group.name}' while collecting registered folders.");
                 }
             }
 
@@ -201,6 +209,32 @@ namespace Editor
 
             Debug.Log($"AutoRegisterModGroups: complete, {created} new group(s) registered.");
             return created;
+        }
+
+        // Makes sure `groupName` is a real addressable group, registering the matching mod
+        // folder on the spot if it isn't one yet. Returns false (with a logged reason) if
+        // there's nothing sensible to build under that name.
+        static bool EnsureModGroupRegistered(AddressableAssetSettings settings, string groupName)
+        {
+            if (settings.FindGroup(groupName) != null) return true;
+
+            var folderAssetPath = RobotsRoot + "/" + groupName;
+            var folderGuid = AssetDatabase.AssetPathToGUID(folderAssetPath);
+            if (string.IsNullOrEmpty(folderGuid))
+            {
+                Debug.LogError($"No addressable group named '{groupName}', and no mod folder at '{folderAssetPath}' to register.");
+                return false;
+            }
+            if (!FolderHasSpawnableRobot(folderAssetPath))
+            {
+                Debug.LogError($"Mod folder '{groupName}' has no robot metadata with both RobotPrefab and MainMenuPrefab set, so it can't be built.");
+                return false;
+            }
+
+            RegisterModGroup(settings, groupName, folderGuid);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"Registered mod group '{groupName}' on demand for this build.");
+            return true;
         }
 
         static void RegisterModGroup(AddressableAssetSettings settings, string groupName, string folderGuid)
@@ -300,7 +334,7 @@ namespace Editor
             var originalIncludeInBuild = new Dictionary<AddressableAssetGroup, bool>();
             foreach (var group in settings.groups)
             {
-                var schema = group?.GetSchema<BundledAssetGroupSchema>();
+                var schema = SafeGetBundledSchema(group);
                 if (schema != null) originalIncludeInBuild[group] = schema.IncludeInBuild;
             }
 
@@ -316,6 +350,14 @@ namespace Editor
                 bool allOk = true;
                 foreach (var spec in specs)
                 {
+                    // Registration happens here, at build time, rather than when the app
+                    // first spots an unregistered mod folder: a folder the user never
+                    // chooses to build should never get an addressable group created for it.
+                    if (!EnsureModGroupRegistered(settings, spec.GroupName))
+                    {
+                        allOk = false;
+                        continue;
+                    }
                     if (!BuildOneGroup(settings, spec))
                     {
                         allOk = false;
@@ -331,7 +373,7 @@ namespace Editor
             {
                 foreach (var kv in originalIncludeInBuild)
                 {
-                    var schema = kv.Key.GetSchema<BundledAssetGroupSchema>();
+                    var schema = SafeGetBundledSchema(kv.Key);
                     if (schema != null) schema.IncludeInBuild = kv.Value;
                 }
 
@@ -376,6 +418,24 @@ namespace Editor
             EditorUtility.SetDirty(group);
         }
 
+        // A group whose .asset was deleted outside Unity still shows up in
+        // settings.groups as a non-null but broken object, and GetSchema throws a
+        // NullReferenceException on it - which would otherwise abort every build in the
+        // project, not just that one group. Treat it as "no schema" and move on.
+        static BundledAssetGroupSchema SafeGetBundledSchema(AddressableAssetGroup group)
+        {
+            if (group == null) return null;
+            try
+            {
+                return group.GetSchema<BundledAssetGroupSchema>();
+            }
+            catch (Exception)
+            {
+                Debug.LogWarning($"Skipping unreadable addressable group '{group.name}' (its asset may have been deleted outside Unity).");
+                return null;
+            }
+        }
+
         static bool BuildOneGroup(AddressableAssetSettings settings, ModBuildSpec spec)
         {
             int groupIndex = -1;
@@ -383,7 +443,7 @@ namespace Editor
             {
                 var group = settings.groups[i];
                 if (group == null) continue;
-                var schema = group.GetSchema<BundledAssetGroupSchema>();
+                var schema = SafeGetBundledSchema(group);
                 if (schema == null) continue;
 
                 bool selected = group.Name == spec.GroupName;

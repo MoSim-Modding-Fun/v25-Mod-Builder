@@ -22,14 +22,6 @@ struct ProjectPage: View {
                         .font(.system(size: 11))
                         .foregroundColor(Theme.dim)
                 }
-                if appState.isScanningForNewGroups {
-                    HStack(spacing: 5) {
-                        ProgressView().scaleEffect(0.4).frame(width: 10, height: 10)
-                        Text("Scanning for new mod folders\u{2026}")
-                            .font(.system(size: 11))
-                            .foregroundColor(Theme.dim)
-                    }
-                }
             }
 
             RufusGroupBox(title: "Unity Editor") {

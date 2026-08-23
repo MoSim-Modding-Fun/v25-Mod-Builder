@@ -5,9 +5,6 @@ struct ProjectInfo {
     let unityVersion: String?
     let groups: [String]
     let error: String?
-    /// True if a background Unity auto-register scan was kicked off for this project -
-    /// the caller should show a "scanning" indicator until scanForNewGroups resolves.
-    let scanning: Bool
 }
 
 /// Mirrors main.js's listAddressableGroups()/resolveProject() in the Electron app -
@@ -24,14 +21,12 @@ enum ProjectService {
     /// Must match AddressablesModExporter.cs's RobotsRoot constant exactly.
     static let robotsRootRelativePath = "Assets/Prefabs/Reefscape/Robots/Mods"
 
-    /// Mirrors main.js's resolveProjectFast(): filesystem-only, no Unity launch, so the
-    /// UI can populate immediately instead of blocking on autoRegisterNewModFolders
-    /// (which can take real wall-clock time). Call scanForNewGroups() afterwards
-    /// (only if `scanning` is true) to run that scan in the background.
+    /// Mirrors main.js's resolveProjectFast(): filesystem-only, no Unity launch anywhere
+    /// in the project-loading path, so selecting a project is instant.
     static func resolveProjectFast(at rawPath: String) -> ProjectInfo {
         // A trailing slash would otherwise make the same project look like two
-        // different keys to UnityLaunchQueue, letting a scan and a build race for the
-        // same project's lock file.
+        // different keys to UnityLaunchQueue, letting a build-time launch race against
+        // itself for the same project's lock file.
         let path = (rawPath as NSString).standardizingPath
         let fm = FileManager.default
         let assetsDir = (path as NSString).appendingPathComponent("Assets")
@@ -40,84 +35,37 @@ enum ProjectService {
         guard fm.fileExists(atPath: assetsDir), fm.fileExists(atPath: versionFile) else {
             return ProjectInfo(
                 projectPath: path, unityVersion: nil, groups: [],
-                error: "\"\(path)\" doesn't look like a Unity project (no Assets/ or ProjectSettings/ProjectVersion.txt).",
-                scanning: false
+                error: "\"\(path)\" doesn't look like a Unity project (no Assets/ or ProjectSettings/ProjectVersion.txt)."
             )
         }
 
         guard let versionText = try? String(contentsOfFile: versionFile, encoding: .utf8) else {
-            return ProjectInfo(projectPath: path, unityVersion: nil, groups: [], error: "Couldn't read ProjectVersion.txt.", scanning: false)
+            return ProjectInfo(projectPath: path, unityVersion: nil, groups: [], error: "Couldn't read ProjectVersion.txt.")
         }
 
         let unityVersion = extractEditorVersion(versionText)
         let groups = listAddressableGroups(projectPath: path)
-        let needsScan = !findCandidateModFolders(projectPath: path).isEmpty
-        return ProjectInfo(projectPath: path, unityVersion: unityVersion, groups: groups, error: nil, scanning: needsScan)
+        return ProjectInfo(projectPath: path, unityVersion: unityVersion, groups: groups, error: nil)
     }
 
-    /// Runs the (possibly slow) auto-register pass and returns the refreshed group
-    /// list. Call only after resolveProjectFast() reported `scanning: true`.
-    static func scanForNewGroups(projectPath: String, unityPath: String?) async -> [String] {
-        await autoRegisterNewModFolders(projectPath: projectPath, unityPath: unityPath)
-        return listAddressableGroups(projectPath: projectPath)
+    /// Mod folders that exist on disk but aren't in any addressable group yet. Purely a
+    /// filesystem read - no Unity launch - so the DETECT button is instant. Nothing is
+    /// created here: an unregistered folder only becomes a real addressable group if the
+    /// user actually picks it and builds it (see EnsureModGroupRegistered in the exporter
+    /// script). Mirrors main.js's 'detect-new-mods' IPC handler.
+    static func detectUnregisteredModFolders(projectPath: String) -> [String] {
+        findCandidateModFolders(projectPath: projectPath)
     }
 
-    /// Runs Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine, which
-    /// scans RobotsRoot for folders with a robot that can actually load and spawn
-    /// (RobotPrefab + MainMenuPrefab both set) and turns any new ones into a proper
-    /// Addressable mod group + modpack metadata asset. Best-effort: any failure here
-    /// just means new folders won't show up as groups yet, not a fatal project-load error.
-    private static func autoRegisterNewModFolders(projectPath: String, unityPath: String?) async {
-        guard let unityPath, FileManager.default.isExecutableFile(atPath: unityPath) else { return }
-        let candidates = findCandidateModFolders(projectPath: projectPath)
-        guard !candidates.isEmpty else { return }
-
-        // Best-effort, like the rest of this scan: if we can't install the driver script,
-        // just skip the scan silently rather than surfacing a hard error for a background
-        // auto-register pass the user didn't explicitly ask for.
-        if case .failed(let error) = UnityScriptInstaller.ensureInstalled(projectPath: projectPath) {
-            print("auto-register scan: couldn't install exporter script: \(error)")
-            return
-        }
-
-        let args = [
-            "-batchmode", "-quit", "-nographics",
-            "-projectPath", projectPath,
-            "-executeMethod", "Editor.AddressablesModExporter.AutoRegisterModGroupsFromCommandLine",
-        ]
-        await UnityLaunchQueue.shared.enqueue(projectPath: projectPath) { clear in
-            // Best-effort: if the project turned out to be open in a foreign Editor and
-            // the user cancelled, just skip this background scan rather than nagging them
-            // twice (a real build later will surface the same prompt if it still applies).
-            guard case .ok = clear else { return }
-            _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int32, Never>) in
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: unityPath)
-                process.arguments = args
-                process.terminationHandler = { proc in
-                    let pid = proc.processIdentifier
-                    Task { @MainActor in UnityLaunchQueue.shared.releaseOwnPid(pid) }
-                    continuation.resume(returning: proc.terminationStatus)
-                }
-                do {
-                    try process.run()
-                    let pid = process.processIdentifier
-                    Task { @MainActor in UnityLaunchQueue.shared.trackOwnPid(pid) }
-                } catch { continuation.resume(returning: -1) }
-            }
-        }
-    }
-
-    /// Cheap filesystem-only pre-check so a normal project select stays instant; Unity
-    /// only gets launched (slow) when there's actually a mod folder no group has claimed
-    /// yet.
+    /// Cheap filesystem-only pre-check so a normal project select stays instant; a group
+    /// only gets created (at build time, via EnsureModGroupRegistered on the Unity side)
+    /// when there's actually a mod folder no group has claimed yet.
     ///
     /// Matches on GUID rather than on folder-vs-group name, exactly like
     /// AutoRegisterModGroups does on the Unity side. Name matching gets this wrong in both
-    /// directions and each mistake costs a full, pointless Unity launch on every project
-    /// load: a group whose name drifted from its folder (folder "Lanternfly" registered as
-    /// group "Lanternfly Mod") looks unregistered forever, and so does any reserved group
-    /// excluded from the UI list.
+    /// directions: a group whose name drifted from its folder (folder "Lanternfly"
+    /// registered as group "Lanternfly Mod") looks unregistered forever, and so does any
+    /// reserved group excluded from the UI list.
     private static func findCandidateModFolders(projectPath: String) -> [String] {
         let robotsRoot = (projectPath as NSString).appendingPathComponent(robotsRootRelativePath)
         let fm = FileManager.default

@@ -1,5 +1,5 @@
 let projectPath = null;
-let isScanningForNewGroups = false;
+let registeredGroupNames = []; // groups that already exist in the project
 let unityPath = null;
 let detectedUnityPath = null;
 let outputDir = null; // null = default "<project>/Mods"
@@ -29,7 +29,8 @@ const els = {
   selectProjectBtn: document.getElementById('select-project-btn'),
   projectPathField: document.getElementById('project-path-field'),
   projectInfo: document.getElementById('project-info'),
-  scanStatus: document.getElementById('scan-status'),
+  detectModsBtn: document.getElementById('detect-mods-btn'),
+  detectStatus: document.getElementById('detect-status'),
   unityPathField: document.getElementById('unity-path-field'),
   unityInfo: document.getElementById('unity-info'),
   browseUnityBtn: document.getElementById('browse-unity-btn'),
@@ -90,10 +91,7 @@ function updateNav() {
   } else if (currentPage === 2) {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = '';
-    els.buildBtn.disabled = !(buildReady && releaseReady) || isScanningForNewGroups;
-    els.buildBtn.title = isScanningForNewGroups
-      ? 'Waiting for the mod-folder scan to finish (see Project page) - starting a build now would just queue behind it.'
-      : '';
+    els.buildBtn.disabled = !(buildReady && releaseReady);
   } else {
     els.nextBtn.style.display = 'none';
     els.buildBtn.style.display = 'none';
@@ -153,16 +151,13 @@ function renderUnityInfo() {
   }
 }
 
-function setScanning(isScanning) {
-  isScanningForNewGroups = isScanning;
-  els.scanStatus.style.display = isScanning ? 'flex' : 'none';
-  syncWindowSize();
-}
+// Mod folders DETECT found that have no addressable group yet, kept so a re-render
+// (e.g. after toggling a checkbox) doesn't lose their NEW badge.
+let unregisteredModFolders = [];
 
 // Shared by the SELECT button and by restoring the remembered project on launch.
-// Populates everything that's known immediately (no waiting on the background
-// auto-register-mod-folders scan main.js may have kicked off - see
-// window.api.onProjectScanComplete below, which fills in any groups that scan finds).
+// Everything here is a plain filesystem read, so the UI is fully populated immediately -
+// nothing in the project-loading path launches Unity.
 function applyProjectInfo(info) {
   if (info.error) {
     renderProjectInfo(info);
@@ -170,7 +165,8 @@ function applyProjectInfo(info) {
     els.unityInfo.textContent = '';
     els.groupsList.textContent = 'No project selected yet.';
     projectPath = null;
-    setScanning(false);
+    unregisteredModFolders = [];
+    els.detectStatus.textContent = '';
     updateNav();
     return;
   }
@@ -178,24 +174,36 @@ function applyProjectInfo(info) {
   projectPath = info.projectPath;
   detectedUnityPath = info.detectedUnityPath;
   unityPath = info.detectedUnityPath;
+  registeredGroupNames = info.groups;
+  // A detect result from a previously-loaded project says nothing about this one.
+  unregisteredModFolders = [];
+  els.detectStatus.textContent = '';
 
   renderProjectInfo(info);
   renderUnityInfo();
-  renderGroups(info.groups);
-  setScanning(Boolean(info.scanning));
+  renderGroups(registeredGroupNames);
   updateNav();
 }
 
-// Fires once the background scan main.js started for this project finishes. Ignored if
-// the user has since selected a different project (matches main.js's own guard).
-window.api.onProjectScanComplete((data) => {
-  if (data.projectPath !== projectPath) return;
-  setScanning(false);
-
-  const currentNames = Object.keys(groupsState);
-  const isSame = data.groups.length === currentNames.length && data.groups.every((n) => currentNames.includes(n));
-  if (!isSame) renderGroups(data.groups);
-  updateNav(); // re-evaluate buildBtn's scanning-gate regardless of whether groups changed
+els.detectModsBtn.addEventListener('click', async () => {
+  if (!projectPath) return;
+  els.detectModsBtn.disabled = true;
+  els.detectStatus.textContent = 'Looking for mod folders…';
+  try {
+    const result = await window.api.detectNewMods(projectPath);
+    if (!result || result.error) {
+      els.detectStatus.innerHTML = `<span class="error">${result ? result.error : 'Detection failed.'}</span>`;
+      return;
+    }
+    unregisteredModFolders = result.unregistered;
+    renderGroups(registeredGroupNames, unregisteredModFolders);
+    els.detectStatus.textContent = unregisteredModFolders.length === 0
+      ? 'No unregistered mod folders found.'
+      : `Found ${unregisteredModFolders.length} new mod folder(s) - check one to build it.`;
+    updateNav();
+  } finally {
+    els.detectModsBtn.disabled = false;
+  }
 });
 
 // Guards against a slow-resolving project load (e.g. the on-launch reload of the
@@ -275,16 +283,22 @@ function renderZipPreview() {
 
 // ---------- Groups & platforms ----------
 
-function renderGroups(names) {
+// `unregisteredNames` are mod folders found by DETECT that have no addressable group
+// yet. They're listed as normally-buildable, and only actually get a group created if
+// the user picks one and builds it - see EnsureModGroupRegistered in the exporter script.
+function renderGroups(names, unregisteredNames = []) {
   groupsState = {};
   els.groupsList.innerHTML = '';
 
-  if (names.length === 0) {
+  const unregistered = new Set(unregisteredNames);
+  const allNames = [...new Set([...names, ...unregisteredNames])].sort();
+
+  if (allNames.length === 0) {
     els.groupsList.textContent = 'No addressable groups found in this project.';
     return;
   }
 
-  for (const name of names) {
+  for (const name of allNames) {
     groupsState[name] = { checked: false, version: '', zipName: '' };
 
     const row = document.createElement('div');
@@ -296,6 +310,13 @@ function renderGroups(names) {
     checkbox.type = 'checkbox';
     mainLabel.appendChild(checkbox);
     mainLabel.appendChild(document.createTextNode(name));
+    if (unregistered.has(name)) {
+      const badge = document.createElement('span');
+      badge.className = 'new-badge';
+      badge.textContent = 'NEW';
+      badge.title = 'Not an addressable group yet - one gets created if you build it.';
+      mainLabel.appendChild(badge);
+    }
     row.appendChild(mainLabel);
 
     const fields = document.createElement('div');

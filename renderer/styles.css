@@ -162,25 +162,25 @@ button:disabled {
   color: #0a7d1f;
 }
 
-.scan-status {
-  color: #555;
-  display: flex;
+.detect-row {
+  margin-top: 6px;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
-.spinner {
+/* Marks a mod folder that has no addressable group yet - one only gets created if the
+   user actually builds it. */
+.new-badge {
   display: inline-block;
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid #b7b7b7;
-  border-top-color: #0078d7;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #0078d7;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
 }
 
 .list {
