@@ -47,6 +47,24 @@ jobs:
       - name: Build installer
         run: npm run dist
 
+      # A file missing from build.files only fails once the app is actually packaged and
+      # launched - `npm start` runs from the source tree and can't catch it. Shipping a
+      # build whose main process dies instantly on "Cannot find module" has happened, so
+      # boot the packaged binary headlessly and fail the build if it doesn't survive.
+      - name: Smoke-test the packaged app
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y xvfb
+          set +e
+          xvfb-run -a timeout 20 ./dist/linux-unpacked/v25-mod-builder > launch.log 2>&1
+          set -e
+          if grep -qiE "Cannot find module|A JavaScript error occurred|Uncaught Exception" launch.log; then
+            echo "::error::Packaged app failed to start:"
+            cat launch.log
+            exit 1
+          fi
+          echo "Packaged app started cleanly."
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:

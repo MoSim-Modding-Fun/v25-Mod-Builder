@@ -22,10 +22,10 @@
     "appId": "com.mosim.v25modbuilder",
     "productName": "v25 Mod Builder",
     "files": [
-      "main.js",
-      "preload.js",
+      "*.js",
       "renderer/**/*",
-      "unity/**/*"
+      "unity/**/*",
+      "build/icons/**/*"
     ],
     "icon": "build/icon.png",
     "mac": {
