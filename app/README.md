@@ -125,6 +125,22 @@ Jobs:
 - **release** — downloads all three and creates a **GitHub Release** with them
   attached.
 
+### The README download table
+
+The download table at the top of the root [`README.md`](../README.md) links to
+`/releases/latest/download/<asset>`, a GitHub permalink that always redirects
+to the newest release. **It never needs editing when you cut a release.**
+
+The one thing that *does* break it is renaming an artifact — the `artifactName`
+entries in `package.json`, or the `ditto` line in the workflow's `build-macos`
+job. Those names are baked into the README's URLs, and GitHub replaces spaces
+with dots in asset filenames (`Mod Builder Installer Mac.zip` is served as
+`Mod.Builder.Installer.Mac.zip`), so the URLs use the dotted form. The
+**Check README download links match the release assets** step in the `release`
+job compares the two and fails the release if they've drifted, rather than
+publishing a table of dead links. If you rename an installer, update the table
+in the same commit.
+
 To cut a release:
 
 ```bash

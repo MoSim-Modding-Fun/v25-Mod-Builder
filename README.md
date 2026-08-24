@@ -5,7 +5,21 @@ Point it at your Unity project, tick the mods and platforms you want, and it
 drives Unity headlessly to produce the finished `.zip` for each platform —
 no command line, no hand-run build scripts.
 
-Available for **Windows**, **macOS**, and **Linux**.
+## Download
+
+| Operating system | Download |
+| --- | --- |
+| **Windows** | [Mod Builder Installer Windows.msi](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases/latest/download/Mod.Builder.Installer.Windows.msi) |
+| **macOS** (13 Ventura or newer) | [Mod Builder Installer Mac.zip](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases/latest/download/Mod.Builder.Installer.Mac.zip) |
+| **Linux** — Arch / CachyOS / Manjaro | [Mod Builder Installer Linux.pacman](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases/latest/download/Mod.Builder.Installer.Linux.pacman) |
+| **Linux** — everything else | [Mod Builder Installer Linux.AppImage](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases/latest/download/Mod.Builder.Installer.Linux.AppImage) |
+
+These links always point at the newest release — they don't need updating when
+a new version ships. See
+[all releases](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases)
+if you need an older version, and [Install](#install) below for the per-OS
+setup steps (macOS and Windows both need one extra click to get past their
+security warnings).
 
 ## Before you start
 
@@ -27,10 +41,7 @@ You do **not** need to add anything to your Unity project by hand. The app
 installs the Editor script it needs (`Assets/Editor/AddressablesModExporter.cs`)
 automatically the first time it builds, and keeps it up to date afterwards.
 
-## Download and install
-
-Grab the installer for your OS from the
-[latest release](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases/latest).
+## Install
 
 ### Windows — `Mod Builder Installer Windows.msi`
 

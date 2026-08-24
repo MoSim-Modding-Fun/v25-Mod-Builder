@@ -148,12 +148,34 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v5
+
       - name: Download all installers
         uses: actions/download-artifact@v4
         with:
           path: installers
           pattern: installer-*
           merge-multiple: true
+
+      # README.md's download table links to /releases/latest/download/<asset>, which
+      # always resolves to the newest release - so those links never need editing per
+      # release, but they DO silently 404 if an artifact ever gets renamed (via
+      # artifactName in app/package.json, or the ditto line in build-macos). Catch that
+      # here rather than shipping a release whose download table is dead. GitHub
+      # dot-encodes spaces in asset filenames, so compare dot-encoded names.
+      - name: Check README download links match the release assets
+        run: |
+          built=$(ls installers | tr ' ' '.' | sort -u)
+          linked=$(grep -o 'releases/latest/download/[^)]*' README.md | sed 's|.*/||' | sort -u)
+          missing=$(comm -23 <(echo "$linked") <(echo "$built"))
+          if [ -n "$missing" ]; then
+            echo "::error::README.md links to release assets that were not built:"
+            echo "$missing"
+            echo "Built assets were:"
+            echo "$built"
+            exit 1
+          fi
+          echo "All README download links match the built assets."
 
       - name: Create release
         uses: softprops/action-gh-release@v2
