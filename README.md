@@ -1,189 +1,161 @@
 # v25 Mod Builder
 
-> **macOS:** this app isn't notarized, so Gatekeeper will block it (and may
-> move it straight to Trash) after downloading. Recover it from Trash if
-> needed, then run:
-> ```bash
-> xattr -cr "/Applications/v25 Mod Builder.app"
-> ```
-> before opening it. See [Packaging](#packaging-optional) below for why.
+A desktop app for building and exporting MoSimulator addressable mod groups.
+Point it at your Unity project, tick the mods and platforms you want, and it
+drives Unity headlessly to produce the finished `.zip` for each platform —
+no command line, no hand-run build scripts.
 
-A small cross-platform (Windows/macOS/Linux) Electron GUI for building and
-exporting MoSimulator addressable mod groups, without hand-running the
-`Tools/build-mods-all-platforms.ps1` script in the MoSim-Reefscape-Public repo.
+Available for **Windows**, **macOS**, and **Linux**.
 
-It drives `Editor.AddressablesModExporter.BuildFromCommandLine` in that Unity
-project. That C# method is what actually sets the per-group bundle-naming
-prefix and build/load paths, builds addressables, copies the platform catalog
-files + robot DLLs into `Mods/<GroupName>/`, and zips the result. This app
-launches Unity headless with the right arguments, once per selected platform,
-and shows you progress/logs.
+## Before you start
 
-**That Editor script ships with this app** (`unity/AddressablesModExporter.cs`)
-and is installed into `<project>/Assets/Editor/` automatically the first time
-the app needs it, then kept up to date by a version marker in the file. That's
-deliberate: the public template project everyone clones
-([MoSimulator/MoSimulator-Public](https://github.com/MoSimulator/MoSimulator-Public))
-doesn't contain it, so requiring people to add it by hand would mean the app
-simply doesn't work on a fresh clone. It's the one file the app writes into
-your Unity project — don't hand-edit the installed copy, since it gets
-overwritten; edit `unity/AddressablesModExporter.cs` here instead.
+You need two things installed already:
 
-## Setup
+- **A MoSimulator Unity project** — a clone of the public template
+  ([MoSimulator/MoSimulator-Public](https://github.com/MoSimulator/MoSimulator-Public))
+  or of MoSim-Reefscape-Public.
+- **The Unity Editor version that project requires**, installed through
+  [Unity Hub](https://unity.com/download). The app reads the required version
+  from your project and looks for a matching install — it won't install Unity
+  for you.
 
-Requires [Node.js](https://nodejs.org) (LTS).
+  If you plan to build for a platform you're not on (for example, the macOS
+  zip from Windows), install that **build support module** for your Unity
+  Editor in Unity Hub first.
+
+You do **not** need to add anything to your Unity project by hand. The app
+installs the Editor script it needs (`Assets/Editor/AddressablesModExporter.cs`)
+automatically the first time it builds, and keeps it up to date afterwards.
+
+## Download and install
+
+Grab the installer for your OS from the
+[latest release](https://github.com/MoSim-Modding-Fun/v25-Mod-Builder/releases/latest).
+
+### Windows — `Mod Builder Installer Windows.msi`
+
+Run the installer and follow the wizard (it lets you choose the install
+location and whether to create Start Menu / desktop shortcuts). It installs
+for your user only, so no administrator password is needed.
+
+Windows SmartScreen will warn you that the publisher is unknown, because these
+builds aren't code-signed. Click **More info → Run anyway**.
+
+Re-running the installer later brings up the standard Windows
+repair / uninstall / reinstall dialog.
+
+### macOS — `Mod Builder Installer Mac.zip`
+
+Unzip it and drag **V25 Mod Builder.app** into your Applications folder.
+
+The app isn't signed by a registered Apple developer, so the first launch is
+blocked. To get past it, **right-click the app → Open**, then click **Open**
+in the dialog. You only have to do this once.
+
+If macOS refuses entirely (or moves the app to the Trash), restore it from the
+Trash, then run:
 
 ```bash
-npm install
-npm start
+xattr -cr "/Applications/V25 Mod Builder.app"
+```
+
+and try opening it again. As a last resort, open **System Settings → Privacy
+& Security** and look for an **Open Anyway** button near the bottom of the
+page right after the block happens.
+
+Requires macOS 13 (Ventura) or newer.
+
+### Linux — `Mod Builder Installer Linux.pacman` or `.AppImage`
+
+On **Arch, CachyOS, Manjaro** and other pacman-based distros, use the
+`.pacman` package — it installs and runs with no extra setup:
+
+```bash
+sudo pacman -U "Mod Builder Installer Linux.pacman"
+```
+
+On **any other distro**, use the portable `.AppImage`. Make it executable
+first, and note it needs `libfuse2` present:
+
+```bash
+chmod +x "Mod Builder Installer Linux.AppImage"
+./"Mod Builder Installer Linux.AppImage"
 ```
 
 ## Using it
 
-1. **Select Unity Project** — pick the root of a MoSimulator Unity project
-   (a clone of the public template, or MoSim-Reefscape-Public). The app reads
-   the required Unity Editor version from `ProjectSettings/ProjectVersion.txt`
-   and lists every Addressable group it finds under
-   `Assets/AddressableAssetsData/AssetGroups/`, except Unity's own default
-   groups and the example/template mods (`LynkMod`, `LynkModOfficial`,
-   `MechTechMod`) that ship in the repo rather than being something to build
-   and distribute. This is all filesystem reads, so it's instant — selecting
-   a project never launches Unity. The project is remembered and reopened
-   automatically next launch.
-2. **Unity Editor** — the app tries the standard Unity Hub install path for
-   the required version on your OS. If it's not found (or you want a
-   different install), click **Browse for Unity Editor...** and point it at
-   your `Unity.exe` (Windows), `Unity.app` (macOS — pick the `.app` bundle
-   itself), or `Unity` binary (Linux). This choice is remembered.
-3. **Groups to build** — check the group(s) you want. Each checked group
-   gets its own optional **Version** and **Zip name override** fields (same
-   as the `-Versions`/`-ZipNames` options in the PowerShell script).
+The app walks you through three pages.
 
-   **DETECT NEW MODS** lists mod folders under
-   `Assets/Prefabs/Reefscape/Robots/Mods/` that don't have an Addressable
-   group yet, tagged `NEW`. That's a plain filesystem check — it doesn't
-   launch Unity and doesn't create anything. A `NEW` folder only becomes a
-   real Addressable group (with its `modpack_metadata` label and build/load
-   paths set) if you actually check it and build it, so mods you never build
-   never clutter the project. Matching is by asset GUID, not by name, so a
-   group whose name has drifted from its folder name is still recognised as
-   already registered.
-4. **Platforms** — Windows/macOS/Linux, all checked by default. Uncheck any
-   you don't need this run.
-5. **Build** — launches Unity headless once per selected platform, in order.
-   Unity can't open a project that's already open in the Editor, so if it is,
-   the app offers to close that Editor for you rather than failing outright —
-   declining cancels the build. (It never touches Unity processes the app
-   started itself.) Launches are serialised per project, so nothing races for
-   the project lock.
+**1. Select Unity Project.** Pick the root folder of your MoSimulator Unity
+project. The app reads the Unity version it needs and lists every Addressable
+group in the project, skipping Unity's own default groups and the bundled
+example mods (`LynkMod`, `LynkModOfficial`, `MechTechMod`). This is instant —
+selecting a project never launches Unity. Your choice is remembered for next
+time.
 
-   Each platform gets its own full Addressables build (required since bundle
-   naming settings are project-wide, not per-group) and is verified by
-   checking that the expected `.zip` actually landed in `Mods/`, not just by
-   trusting Unity's exit code. If a platform fails, the run stops there.
+**2. Unity Editor.** The app finds your Unity Hub install of the required
+version automatically. If it can't, click **Browse for Unity Editor...** and
+point it at your `Unity.exe` (Windows), `Unity.app` bundle (macOS), or `Unity`
+binary (Linux). This is remembered too.
 
-   A **RETRY** button then appears, which rebuilds only what didn't succeed —
-   the platform that failed plus any that never got to run. Platforms that
-   already built keep their green badge, their console output and their zips,
-   so fixing one platform doesn't cost you a full rebuild of the others (and a
-   GitHub release afterwards still attaches every platform's artifacts).
+**3. Groups to build.** Tick the mod group(s) you want. Each ticked group gets
+its own optional **Version** and **Zip name override** fields — use the zip
+name override if you want the released file named something other than the
+Addressable group name.
 
-## Packaging (optional)
+Click **DETECT NEW MODS** to list mod folders in your project that don't have
+an Addressable group yet; they show up tagged `NEW`. Nothing is created just
+by detecting them — a `NEW` mod only becomes a real Addressable group if you
+tick it and build it, so mods you never build won't clutter your project.
 
-```bash
-npm run dist
-```
+**4. Platforms.** Windows, macOS and Linux are all ticked by default. Untick
+any you don't need for this run.
 
-Uses `electron-builder` to produce an installer for whatever OS you run it
-on (`.msi` on Windows, `.dmg` on macOS, `.AppImage` **and** `.pacman` on
-Linux). The `.pacman` package is the one to grab on Arch/CachyOS/Manjaro —
-install it with `sudo pacman -U "Mod Builder Installer Linux.pacman"` and it
-runs immediately, no `chmod +x` or `libfuse2` needed (that's only required
-for the AppImage, which is the portable fallback for non-Arch distros). The
-Windows
-installer is a full multi-page wizard (install location, Start Menu/desktop
-shortcut options) built on real Windows Installer (MSI), not a one-click
-NSIS installer — so re-running it over an existing install brings up the
-standard repair/uninstall/reinstall maintenance dialog automatically; that's
-native MSI behavior keyed off a stable upgrade code (derived from `appId`),
-not something configured separately. This repo doesn't set up code signing
-or notarization — packaged builds will trigger an "unidentified developer"
-warning on macOS and a SmartScreen warning on
-Windows unless you sign them yourself.
+**5. Build.** The app launches Unity in the background, once per selected
+platform, and streams the log so you can watch progress. Each platform gets a
+full Addressables build (unavoidable — the bundle naming settings are
+project-wide), and the app confirms the expected `.zip` actually landed in
+`Mods/` rather than just trusting Unity's exit code.
 
-**On macOS specifically**, recent macOS versions (Sequoia+) don't just warn
-on an unsigned, unnotarized app — they block it outright with a
-"malware blocked and moved to Trash" dialog. Real Apple notarization (which
-stops this) requires a paid Apple Developer Program membership ($99/year);
-there's no free way around that check, since it validates against Apple's
-own servers. The mac build here is ad-hoc signed (`identity: "-"` in
-`package.json`, free, no account needed) purely so the app can launch at all
-on Apple Silicon — it does **not** satisfy Gatekeeper's notarization check.
-Until/unless notarization gets set up, anyone installing on macOS needs to
-manually clear the quarantine flag after downloading:
+Unity can't open a project that's already open in the Editor. If yours is, the
+app offers to close that Editor for you — declining just cancels the build. It
+never touches Unity windows it didn't open itself.
 
-```bash
-# If Gatekeeper already deleted it, re-extract "v25 Mod Builder.app" from
-# the .dmg first, then:
-xattr -cr "/Applications/v25 Mod Builder.app"
-```
+If a platform fails, the run stops there and a **RETRY** button appears. Retry
+rebuilds only what didn't succeed — the platform that failed plus any that
+never got a turn. Platforms that already built keep their output and their
+zips, so fixing one platform doesn't cost you a rebuild of the others.
 
-Or: after the block, open **System Settings → Privacy & Security** and look
-for an "Open Anyway" button near the bottom of the page.
+## Troubleshooting
 
-### CI builds (GitHub Actions)
+**"Unity Editor not found."** The required version probably isn't installed,
+or lives outside the default Unity Hub location. Install it via Unity Hub, or
+use **Browse for Unity Editor...** to point at it directly.
 
-`.github/workflows/build-installers.yml` only triggers on a pushed version
-tag matching `v*.*.*` (e.g. `v1.0.0`) — nothing runs on ordinary pushes or
-PRs. One job per OS builds on GitHub's own Windows/macOS/Linux runners via
-`npm run dist`, uploads each installer as a workflow artifact
-(`installer-windows`/`installer-macos`/`installer-linux`), then a final job
-downloads all three and creates a **GitHub Release** with them attached.
-Same caveat as above: these are unsigned builds.
+**A build fails only for one platform.** You're most likely missing that
+platform's build support module in Unity Hub. Add it to your Unity Editor
+install (Unity Hub → Installs → the gear icon → Add modules), then hit
+**RETRY**.
 
-To cut a release:
+**Where are my settings stored?** Your last project, any manual Unity Editor
+path, and the output folder override are saved outside the app's install
+folder, so they survive reinstalls:
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+| OS | Location |
+| --- | --- |
+| Windows | `%APPDATA%\v25-mod-builder\settings.json` |
+| macOS | app preferences (`com.v25.modbuilder`) |
+| Linux | `~/.config/v25-mod-builder/settings.json` |
 
-## Branding
+If you used the older "MoSim Mod Builder" release, your settings are migrated
+automatically on first launch.
 
-`logo.png` / `logo.ai` at the repo root are the source logo files.
-`build/icon.png` is a copy of `logo.png` used as the app icon everywhere:
-the runtime window icon (`main.js`), the renderer favicon, and the
-packaged-installer icon (`electron-builder`'s `build.icon` /
-`build.win.icon` / `build.mac.icon` / `build.linux.icon` config in
-`package.json`; it auto-generates `.icns` for macOS from the PNG at
-`npm run dist` time).
+**Where does the output go?** Into `Mods/<GroupName>/` inside your Unity
+project, unless you set an output folder override.
 
-Windows is the exception: its taskbar/title-bar icon renders blurry from a
-single scaled PNG, so it needs a real multi-resolution `.ico` — that's
-`build/icon.ico`, pre-generated and checked into `build/`.
+## Source code
 
-To update the logo: replace `logo.png` (and `logo.ai`), copy it to
-`build/icon.png`, then regenerate the Windows icon:
-
-```bash
-cp logo.png build/icon.png
-npm run icon
-```
-
-## Known limitations
-
-- Cross-compiling for a platform (e.g. building the macOS zip from Windows)
-  requires that build-target's module to be installed in your local Unity
-  Editor install, same as building manually.
-- The app doesn't manage Unity Editor installs — it only detects or lets you
-  point at one you've already installed via Unity Hub.
-- Settings (last project path, manual Unity path override, output folder
-  override) persist to `settings.json` in Electron's per-OS user-data
-  directory (`app.getPath('userData')` — e.g. `%APPDATA%\v25-mod-builder` on
-  Windows, `~/Library/Application Support/v25-mod-builder` on macOS,
-  `~/.config/v25-mod-builder` on Linux). That's deliberate: it's writable
-  per-user storage, unlike the app's own install directory, so settings still
-  work once this ships as an installed app (`npm run dist`) living somewhere
-  like `Program Files` rather than run from a dev checkout via `npm start`.
-  (This app was previously named "MoSim Mod Builder" / `mosim-modbuilder`;
-  `main.js` migrates settings.json from that old location automatically.)
+Everything that builds this app lives in [`app/`](app) — the Electron app
+(Windows/Linux), the native macOS app, the bundled Unity Editor script, and
+build/packaging instructions. See [`app/README.md`](app/README.md) if you want
+to build it yourself or contribute.

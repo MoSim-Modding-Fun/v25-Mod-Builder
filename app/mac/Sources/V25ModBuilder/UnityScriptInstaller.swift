@@ -27,17 +27,17 @@ enum UnityScriptInstaller {
 
     /// The bundled copy: inside Contents/Resources when running as a packaged .app (see
     /// the Bundle .app step in .github/workflows/build-installers.yml), or alongside the
-    /// repo checkout when running from `swift run` during development.
+    /// app/ checkout when running from `swift run` during development.
     static func bundledScriptURL() -> URL? {
         if let url = Bundle.main.url(forResource: "AddressablesModExporter", withExtension: "cs") {
             return url
         }
-        // Dev fallback: <repo>/mac/.build/... -> <repo>/unity/AddressablesModExporter.cs
+        // Dev fallback: <repo>/app/mac/.build/... -> <repo>/app/unity/AddressablesModExporter.cs
         let devURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent() // V25ModBuilder
             .deletingLastPathComponent() // Sources
             .deletingLastPathComponent() // mac
-            .deletingLastPathComponent() // repo root
+            .deletingLastPathComponent() // app/
             .appendingPathComponent("unity/AddressablesModExporter.cs")
         return FileManager.default.fileExists(atPath: devURL.path) ? devURL : nil
     }

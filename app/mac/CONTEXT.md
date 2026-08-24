@@ -15,8 +15,9 @@ directly — this is a written summary of everything relevant instead).
    (or any repo with that same Editor script) to actually use either GUI tool.
 
 2. **v25 Mod Builder** (Electron, Windows/macOS/Linux) — the original
-   cross-platform GUI. This is the repo root **one level up from this `mac/`
-   folder** (`main.js`, `renderer/`, `package.json`, etc. all live there).
+   cross-platform GUI. It lives **one level up from this `mac/` folder**, in
+   the repo's `app/` directory (`main.js`, `renderer/`, `package.json`, etc.
+   all live there; the repo root itself holds only `README.md` and `.github/`).
    Fully working on Windows (verified via GitHub Actions CI). This is the
    "spec" this native app is porting: same workflow, same visual design
    (Rufus-style light theme with a wizard flow), same Unity CLI invocation.
@@ -96,7 +97,7 @@ Sources/V25ModBuilder/
 Every piece of business logic (project validation rules, reserved group names
 to exclude, Unity CLI arguments, log-line parsing for progress, output-move
 logic, zip filename computation) is a **direct port** of the Electron app's
-`main.js`/`renderer.js` — read those files at the repo root (`../main.js`,
+`main.js`/`renderer.js` — read those files in `app/` (`../main.js`,
 `../renderer/renderer.js` relative to this folder) if anything here is
 ambiguous; they're the source of truth for *what* the behavior should be,
 this Swift code is just a different *how*.
@@ -124,7 +125,7 @@ path override, output folder override.
   borders, and layout otherwise match the Electron app's CSS pixel-for-pixel
   where feasible.
 - **No app icon wired in yet** — the Electron app's `logo.png`/`build/icon.png`
-  exist at the repo root (`../logo.png`, `../build/icon.png` relative to this
+  exist in `app/` (`../logo.png`, `../build/icon.png` relative to this
   folder) and could be dropped into an `Assets.xcassets` AppIcon set once this
   is opened in Xcode.
 - **No code signing configured yet** for this app either. At minimum it'll
@@ -147,8 +148,9 @@ touch the Electron app or its CI while working from this checkout.)
   specifically to get native Windows Installer repair/uninstall/reinstall
   maintenance-mode detection on re-run. `perMachine: false` (per-user install,
   no admin required, at the user's request).
-- **GitHub Actions** (`.github/workflows/build-installers.yml` in the Electron
-  repo): triggers **only** on pushed tags matching `v*.*.*` — not on ordinary
+- **GitHub Actions** (`.github/workflows/build-installers.yml`, at the repo
+  root — GitHub only reads workflows from there, which is why `.github/` did
+  not move into `app/`): triggers **only** on pushed tags matching `v*.*.*` — not on ordinary
   pushes/PRs. Builds all three platforms, uploads as artifacts, and on tag
   pushes also creates a GitHub Release with all three installers attached.
   Had to fix: `electron-builder --publish never` (it was trying to
