@@ -8,14 +8,24 @@ struct ModGroup: Identifiable, Equatable {
     var zipName: String = ""
 }
 
-/// Must match PLATFORM_TARGETS in the Electron app's main.js and the Windows-side
-/// ZipPlatformLabel() in AddressablesModExporter.cs - these three strings are exactly
-/// what Unity's -buildTarget argument expects.
+/// Must match PLATFORM_TARGETS in the Electron app's main.js and ZipPlatformLabel() in
+/// AddressablesModExporter.cs. The raw values are *our* identifiers (persisted, shown in
+/// logs); they are not the vocabulary Unity's -buildTarget uses - see buildTargetArg.
 enum PlatformTarget: String, CaseIterable, Identifiable, Equatable {
     case win64, osx, linux64
 
     var id: String { rawValue }
-    var buildTargetArg: String { rawValue }
+
+    /// What Unity's -buildTarget actually accepts. macOS is "OSXUniversal", not "osx":
+    /// an unrecognized name leaves the Editor on its previous active build target, so the
+    /// exporter rebuilds that platform's zip and the requested one never appears.
+    var buildTargetArg: String {
+        switch self {
+        case .win64: return "win64"
+        case .osx: return "OSXUniversal"
+        case .linux64: return "linux64"
+        }
+    }
 
     /// Matches AddressablesModExporter.cs's ZipPlatformLabel - used in the zip filename.
     var zipLabel: String {

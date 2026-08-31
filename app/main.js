@@ -311,10 +311,15 @@ ipcMain.handle('browse-output-folder', async () => {
 
 // ---------- IPC: build ----------
 
+// `key` is our own identifier (persisted in settings, sent over IPC, used by the
+// renderer). `buildTargetArg` is what Unity's -buildTarget actually accepts, which is
+// NOT the same vocabulary: macOS is "OSXUniversal" there. Passing an unrecognized name
+// leaves the Editor on its previous active build target, so the exporter would happily
+// rebuild the *previous* platform's zip and the macOS one would never appear.
 const PLATFORM_TARGETS = [
-  { key: 'win64', label: 'Windows' },
-  { key: 'osx', label: 'MacOS' },
-  { key: 'linux64', label: 'Linux' },
+  { key: 'win64', label: 'Windows', buildTargetArg: 'win64' },
+  { key: 'osx', label: 'MacOS', buildTargetArg: 'OSXUniversal' },
+  { key: 'linux64', label: 'Linux', buildTargetArg: 'linux64' },
 ];
 
 // Same signal AddressablesModExporter's PowerShell driver uses: Unity's own exit code
@@ -595,7 +600,7 @@ ipcMain.handle('run-build', async (event, config) => {
     const args = [
       '-batchmode', '-quit', '-nographics',
       '-projectPath', projectPath,
-      '-buildTarget', targetKey,
+      '-buildTarget', target.buildTargetArg,
       '-executeMethod', 'Editor.AddressablesModExporter.BuildFromCommandLine',
       '-groups', groupsArg,
       '-logFile', logFile,
