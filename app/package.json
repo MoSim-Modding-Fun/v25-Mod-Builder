@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Cross-platform GUI for building and exporting MoSimulator addressable mod groups.",
   "main": "main.js",
+  "homepage": "https://github.com/MoSim-Modding-Fun/v25-Mod-Builder",
   "author": {
     "name": "seb",
     "email": "seb@sebastianw.tech"
